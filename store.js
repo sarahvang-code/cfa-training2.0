@@ -8,13 +8,101 @@ export class TrainingStore{
  async renameSection(categoryId,oldName,newName){if(!this.canEdit())throw Error('Owner access required.');if(this.cloud){await this.request('/rest/v1/items?category_id=eq.'+encodeURIComponent(categoryId)+'&section=eq.'+encodeURIComponent(oldName),{method:'PATCH',body:{section:newName}});await this.load();}else{this.data.items.filter(i=>i.category_id===categoryId&&i.section===oldName).forEach(i=>i.section=newName);this.persist();}}
  configure(url,key){url=url.trim().replace(/\/$/,'');key=key.trim();if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url))throw Error('Enter your Supabase project URL (https://your-project.supabase.co).');let valid=key.startsWith('sb_publishable_');if(key.startsWith('eyJ')){try{valid=JSON.parse(atob(key.split('.')[1])).role==='anon';}catch{valid=false;}}if(!valid)throw Error('Use the publishable key or legacy anon key, never a secret/service-role key.');this.storage.setItem('training-connection',JSON.stringify({url,key}));}
  async request(path,{method='GET',body,prefer='return=representation'}={}){if(!this.session&&method!=='GET')throw Error('Owner or trainer sign-in is required to save changes.');if(this.session&&this.session.expires_at<Date.now()/1000+60)await this.refresh();const r=await fetch(this.config.url+path,{method,headers:{apikey:this.config.key,...(this.session?{Authorization:`Bearer ${this.session.access_token}`}:{ }),'Content-Type':'application/json',Prefer:prefer},body:body===undefined?undefined:JSON.stringify(body)});const txt=await r.text();let value;try{value=txt?JSON.parse(txt):null;}catch{throw Error('Unexpected response from Supabase.');}if(!r.ok)throw Error(value?.message||value?.msg||value?.error_description||'Could not save. Check your connection and permissions.');return value;}
- async auth(body,grant='password'){const r=await fetch(this.config.url+'/auth/v1/token?grant_type='+grant,{method:'POST',headers:{apikey:this.config.key,'Content-Type':'application/json'},body:JSON.stringify(body)});const value=await r.json();if(!r.ok)throw Error(value.msg||value.error_description||'Sign-in failed.');this.session={...value,expires_at:value.expires_at||Date.now()/1000+value.expires_in};}
- async refresh(){if(this.refreshing)return this.refreshing;this.refreshing=(async()=>{try{await this.auth({refresh_token:this.session.refresh_token},'refresh_token');}catch(e){this.session=null;this.profile=null;throw Error('Your session expired. Please sign in again.');}finally{this.refreshing=null;}})();return this.refreshing;}
- async requestSignInLink(email){const r=await fetch(this.config.url+'/auth/v1/otp',{method:'POST',headers:{apikey:this.config.key,'Content-Type':'application/json'},body:JSON.stringify({email:email.trim(),create_user:true})});const value=await r.json();if(!r.ok)throw Error(value.msg||value.error_description||'Could not send your sign-in link.');}
- async verifySignIn(email,input){let body;input=input.trim();if(/^\d{6,10}$/.test(input))body={email:email.trim(),token:input,type:'email'};else{let url;try{url=new URL(input);}catch{throw Error('Paste the sign-in link from your email, or the email code.');}if(url.origin!==this.config.url||url.pathname!=='/auth/v1/verify')throw Error('Use the original Supabase sign-in link from your email.');const token_hash=url.searchParams.get('token_hash')||url.searchParams.get('token'),type=url.searchParams.get('type')||'email';if(!token_hash||!['email','magiclink','signup'].includes(type))throw Error('That link is not a valid email sign-in link.');body={token_hash,type};}const r=await fetch(this.config.url+'/auth/v1/verify',{method:'POST',headers:{apikey:this.config.key,'Content-Type':'application/json'},body:JSON.stringify(body)});const value=await r.json();if(!r.ok)throw Error(value.msg||value.error_description||'The sign-in link is invalid or expired.');if(value.user?.email?.toLowerCase()!==email.trim().toLowerCase())throw Error('The sign-in link belongs to a different email address.');await this.activateSession(value);}
- async activateSession(value){this.session={...value,expires_at:value.expires_at||Date.now()/1000+value.expires_in};try{const profiles=await this.request('/rest/v1/access_users?user_id=eq.'+this.session.user.id);this.profile=profiles[0];if(!this.profile)throw Error('This email has not been approved for owner or trainer access.');await this.load();}catch(e){this.session=null;this.profile=null;await this.load().catch(()=>{});throw e;}}
- async login(email,password){await this.auth({email,password});const profiles=await this.request('/rest/v1/access_users?user_id=eq.'+this.session.user.id);this.profile=profiles[0];if(!this.profile){this.session=null;throw Error('Your account has no training access yet. Confirm your email and ask the owner to approve it for this workspace.');}await this.load();}
- async logout(){try{if(this.session)await this.request('/auth/v1/logout',{method:'POST'});}finally{this.session=null;this.profile=null;await this.load();}}
+ async authRequest(path,body){
+  const r=await fetch(this.config.url+path,{method:'POST',headers:{apikey:this.config.key,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const text=await r.text();let value;
+  try{value=text?JSON.parse(text):{};}catch{throw Error('Could not reach sign-in. Please try again.');}
+  if(!r.ok){
+   if(value.code==='otp_expired'||value.error_code==='otp_expired')throw Error('That sign-in link or code has already been used or has expired. Request a new email and use its latest link or code.');
+   throw Error(value.msg||value.message||value.error_description||'Sign-in failed. Please try again.');
+  }
+  return value;
+ }
+ rememberSession(){
+  if(this.session)this.storage.setItem('training-owner-session',JSON.stringify({project:this.config.url,session:this.session}));
+ }
+ clearSession(){
+  this.session=null;this.profile=null;
+  this.data.members=[];this.data.progress=[];
+  this.storage.removeItem('training-owner-session');
+ }
+ async refresh(){
+  if(this.refreshing)return this.refreshing;
+  this.refreshing=(async()=>{
+   try{
+    const value=await this.authRequest('/auth/v1/token?grant_type=refresh_token',{refresh_token:this.session.refresh_token});
+    this.session={...value,expires_at:value.expires_at||Date.now()/1000+(value.expires_in||3600)};
+    this.rememberSession();
+   }catch(e){this.clearSession();throw Error('Your session expired. Please sign in again.');}
+   finally{this.refreshing=null;}
+  })();
+  return this.refreshing;
+ }
+ async requestSignInLink(email,redirectTo=this.config.siteUrl){
+  let path='/auth/v1/otp';
+  if(redirectTo){
+   const url=new URL(redirectTo);
+   if(url.protocol!=='https:'&&!(url.protocol==='http:'&&url.hostname==='localhost'))throw Error('The sign-in return address must use HTTPS.');
+   url.hash='';url.search='';
+   path+='?redirect_to='+encodeURIComponent(url.href);
+  }
+  await this.authRequest(path,{email:email.trim(),create_user:true});
+ }
+ async verifySignIn(email,input){
+  let body;input=input.trim();const code=input.replace(/\s/g,'');
+  if(/^\d{6,10}$/.test(code))body={email:email.trim(),token:code,type:'email'};
+  else{
+   let url;try{url=new URL(input);}catch{throw Error('Paste the sign-in link from your email, or the email code.');}
+   if(url.origin!==this.config.url||url.pathname!=='/auth/v1/verify')throw Error('Copy the original sign-in link from your email. If you already opened it, request a new email.');
+   const token_hash=url.searchParams.get('token_hash')||url.searchParams.get('token'),type=url.searchParams.get('type')||'email';
+   if(!token_hash||!['email','magiclink','signup'].includes(type))throw Error('That link is not a valid email sign-in link.');
+   body={token_hash,type};
+  }
+  const value=await this.authRequest('/auth/v1/verify',body);
+  await this.activateSession(value,email);
+ }
+ async handleAuthCallback(input){
+  const url=new URL(input),params=new URLSearchParams(url.hash.slice(1));
+  const error=params.get('error_description')||url.searchParams.get('error_description');
+  if(error){
+   if((params.get('error_code')||url.searchParams.get('error_code'))==='otp_expired')throw Error('That sign-in link has already been used or has expired. Request a new email.');
+   throw Error(error);
+  }
+  const access_token=params.get('access_token'),refresh_token=params.get('refresh_token');
+  if(access_token&&refresh_token){
+   if(params.get('type')==='recovery')throw Error('Use an owner sign-in email, rather than a password reset link.');
+   await this.activateSession({access_token,refresh_token,expires_in:Number(params.get('expires_in'))||3600});
+   return true;
+  }
+  const token_hash=url.searchParams.get('token_hash'),type=url.searchParams.get('type')||'email';
+  if(token_hash&&['email','magiclink','signup'].includes(type)){
+   const value=await this.authRequest('/auth/v1/verify',{token_hash,type});
+   await this.activateSession(value);return true;
+  }
+  return false;
+ }
+ async activateSession(value,email){
+  if(!value.access_token)throw Error('Sign-in did not return a session. Request a new email.');
+  this.session={...value,expires_at:value.expires_at||Date.now()/1000+(value.expires_in||3600)};this.profile=null;
+  try{
+   // Resolve identity with Auth; never trust a stored user or a role from a URL.
+   const user=await this.request('/auth/v1/user');
+   if(!user?.id||!user.email_confirmed_at)throw Error('Please verify your email before signing in.');
+   if(email&&user.email?.toLowerCase()!==email.trim().toLowerCase())throw Error('The sign-in link belongs to a different email address.');
+   this.session.user=user;
+   const profiles=await this.request('/rest/v1/access_users?user_id=eq.'+encodeURIComponent(user.id));
+   this.profile=profiles[0];
+   if(!this.profile||!['owner','trainer','member'].includes(this.profile.role))throw Error('This email has not been approved for owner or trainer access.');
+   await this.load();this.rememberSession();
+  }catch(e){this.clearSession();await this.load().catch(()=>{});throw e;}
+ }
+ async restoreSession(){
+  let stored;try{stored=JSON.parse(this.storage.getItem('training-owner-session')||'null');}catch{this.clearSession();return false;}
+  if(!stored)return false;
+  if(stored.project!==this.config.url||!stored.session?.access_token){this.clearSession();return false;}
+  await this.activateSession(stored.session);return true;
+ }
+ async logout(){try{if(this.session)await this.request('/auth/v1/logout',{method:'POST'});}finally{this.clearSession();await this.load();}}
  async load(){if(!this.cloud)return;const [categories,items,settings]=await Promise.all(['categories?order=position','items?order=position','settings'].map(t=>this.request('/rest/v1/'+t)));let members=[],progress=[];if(this.session&&this.profile)[members,progress]=await Promise.all(['members?order=name','progress'].map(t=>this.request('/rest/v1/'+t)));this.data={categories,items,members,progress,settings:settings[0]||{name:'Restaurant Training'}};}
  canEdit(){return !this.cloud||this.profile?.role==='owner';}
  canTrain(){return !this.cloud||['owner','trainer'].includes(this.profile?.role);}
