@@ -1,10 +1,9 @@
 # cfa-training2.0
-training for CFA FOH BOH
 
-## Training app
+FOH and BOH restaurant training app.
 
-Complete FOH/BOH checklist, training editor, and progress views. Shared data uses the Training App Supabase project. Owner email approval is pending.
+Training pages are open to view without signup. Approved owners and trainers use email-link sign-in to edit content and record team progress.
 
 Live app: https://restaurant-training.fondmoss.chatgpt.site
 
-See SETUP.md for account creation, access rules, home-screen support, and GitHub Pages settings. Run local checks with `npm test`.
+See SETUP.md for access rules and home-screen support. Run tests with `npm test`.

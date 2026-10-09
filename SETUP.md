@@ -1,15 +1,12 @@
 # Restaurant Training
 
-The app is connected to the Supabase **Training App** project. Training categories, checklist items, team members, and progress share that database. Owner email approval is still pending, so no owner access has been assigned.
+The app is connected to the Supabase **Training App** project. FOH and BOH training pages are open to view, with no signup or password screen. Team records and progress require an authorized leader sign-in.
 
-## First login
+## Owner access
 
-1. Confirm the email address that should own this workspace.
-2. Once approved, the setup administrator adds that email to `training_private.invitations` with role `owner`.
-3. Open the app and select **Create account**. Use the approved email and choose your own password of at least 12 characters.
-4. Confirm the email sent by Supabase, return to the app, and sign in. Keep Supabase's **Confirm email** setting enabled.
+The owner email has been approved privately in the database. Select **Owner sign-in**, enter your approved email, and request a one-time sign-in link. Copy the link from the Supabase email and paste it into the verification form without opening it first. If your email template includes a code, you can enter the code instead. This verifies your email and activates your full owner role without asking you to set a password or fill out a registration form.
 
-Connecting Supabase or GitHub does not create an app login. Do not send your password in chat. Account creation and confirmation happen through the app and Supabase.
+Email-link sign-in creates the underlying Supabase Auth identity on the first verified use. The database grants a role only to approved, confirmed email addresses. Visitors can browse checklists immediately; public viewers cannot edit records or access team progress. Keep Supabase's email confirmation enabled.
 
 Additional leaders can be approved by adding their email to the private invitations table with role `trainer`. Owners can edit training content and settings. Owners and trainers can manage team records and record progress. Training members without logins can be tracked by their trainers. Optional member logins use role `member` and require their team record's `auth_user_id` to be linked to their own user ID by an administrator.
 
@@ -34,11 +31,11 @@ GitHub source: https://github.com/sarahvang-code/cfa-training2.0
 
 For GitHub Pages, use repository Settings → Pages → Deploy from a branch → main → / (root). The static app uses relative paths and can work under the repository path. GitHub stores and serves code; training data is read and written directly through Supabase with the signed-in user's permissions.
 
-For a fresh Supabase project, run `supabase-schema.sql`, then `supabase-account-access.sql`, once each. Do not rerun them against the configured Training App project. Use only a publishable API key in `config.js`; never a secret or service-role key. Invited emails and access grants are private database data, not public source configuration.
+For a fresh Supabase project, run `supabase-schema.sql`, then `supabase-account-access.sql`, then `supabase-public-view.sql`, once each. Do not rerun them against the configured Training App project. Use only a publishable API key in `config.js`; never a secret or service-role key. Invited emails and access grants are private database data, not public source configuration.
 
 ## Verification and home screen
 
-Local progress, persistence, hide/restore, and mocked API tests pass. Database checks confirm accounts without training access cannot see training or team rows. All exposed app tables have Row Level Security. The private invitation table intentionally has no client policies or grants. A real owner login and two-device synchronization need testing after the owner's email is approved and account confirmed.
+Local progress, persistence, hide/restore, and mocked API tests pass. Database checks confirm accounts without training access cannot see training or team rows. All exposed app tables have Row Level Security. The private invitation table intentionally has no client policies or grants. Anonymous read access has been checked against the database. The owner email-link sign-in and two-device synchronization complete after the owner verifies their email.
 
 On two devices, sign in to the same project as authorized leaders. Add a member, edit a checklist item, and record Trained on device A. Reload device B or wait up to 15 seconds with the app visible; confirm the changes appear. Verify that a member can see only their own record and cannot edit training.
 
