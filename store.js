@@ -1,3 +1,5 @@
+import {primarySandwichItems} from './boh-builds.js';
+
 export const titles=['Welcome & Restaurant Tour','BOH Food Safety','Primary','Secondary','Machines','Breading','Fries','RSA Assessment','Closing'];
 const starter=[['Clock in and meet your trainer','Restaurant tour','Uniform and handwashing expectations'],['Handwashing and glove use','Temperature checks','Prevent cross-contamination'],['Set up the primary station','Practice order assembly'],['Set up the secondary station','Practice station handoffs'],['Equipment overview','Safe operation and cleaning'],['Prepare the breading station','Review safe handling'],['Prepare the fry station','Review timers and holding procedures'],['Review restaurant safety expectations','Complete the trainer assessment'],['Complete station cleaning','Review the closing checklist']];
 export function seed(){const categories=titles.map((title,i)=>({id:`c${i}`,title,description:i===0?'A great first day starts here.':'Practice the essentials with your trainer.',position:i}));const items=starter.flatMap((a,i)=>a.map((title,j)=>({id:`i${i}-${j}`,category_id:`c${i}`,section:i===0?'Welcome':'Station essentials',title,notes:'Example checklist item. Replace with your restaurant’s approved training.',link:'',position:j})));return {categories,items,members:[{id:'m1',name:'Alex Morgan',role:'Team member',auth_user_id:null},{id:'m2',name:'Jordan Lee',role:'Team member',auth_user_id:null},{id:'m3',name:'Taylor Reed',role:'Team member',auth_user_id:null}],progress:[],settings:{name:'Restaurant Training'}};}
@@ -13,11 +15,11 @@ export class TrainingStore{
   const text=await r.text();let value;
   try{value=text?JSON.parse(text):{};}catch{throw Error('Could not reach sign-in. Please try again.');}
   if(!r.ok){
-   const code=value.code||value.error_code,message=value.msg||value.message||value.error_description||'Sign-in failed. Please try again.';
-   if(r.status===429&&path.split('?')[0]==='/auth/v1/otp'&&code==='over_email_send_rate_limit'){
+   const code=value.error_code||value.code,message=value.msg||value.message||value.error_description||'Sign-in failed. Please try again.';
+   if(r.status===429&&path.split('?')[0]==='/auth/v1/otp'&&(code==='over_email_send_rate_limit'||/email rate limit exceeded/i.test(message))){
     const seconds=String(message).match(/after\s+(\d+)\s+seconds?\b/i)?.[1];
-    if(seconds)throw Error(`Wait ${seconds} seconds before requesting another email. You can still use a link you already have.`);
-    throw Error('The hourly sign-in email limit has been reached. Choose “I already have a link or code” to use an existing sign-in, or try again later.');
+    const error=Error(seconds?`No new email was sent. Wait ${seconds} seconds before requesting another, or use a link you already have.`:'No new email was sent because the hourly limit was reached. You can use a link you already have, or wait before requesting another.');
+    error.code='over_email_send_rate_limit';throw error;
    }
    if(code==='otp_expired')throw Error('That sign-in link or code has already been used or has expired. If it opened a Safari error page, paste the address from that tab here.');
    throw Error(message);
@@ -136,6 +138,7 @@ export function seedReference(){
   'Closing':{'Closing Boards':['Clean and sanitize boards','Restock the station'],'Closing Machines':['Complete machine cleaning procedures'],'Closing Breading Table':['Clean and sanitize the breading table'],'Closing Dishes':['Wash and organize dishes']}
  };
  for(const c of data.categories){if(groups[c.title]){data.items=data.items.filter(i=>i.category_id!==c.id);let position=0;for(const [section,names]of Object.entries(groups[c.title]))for(const title of names)data.items.push({id:`${c.id}-ref-${position}`,category_id:c.id,section,title,notes:'',link:'',position:position++,hidden:false});}}
+ data.items.push(...primarySandwichItems.map(item=>({...item})));
  const foh={
   'Welcome & Restaurant Tour':groups['Welcome & Restaurant Tour'],
   'FOH Food Safety':{'Food Safety Basics':['Handwashing before food handling','Prevent cross-contamination','Review approved cleaning and sanitizing procedures']},

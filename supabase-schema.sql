@@ -118,6 +118,17 @@ insert into public.items(id,category_id,section,title,notes,link,hidden,position
 insert into public.items(id,category_id,section,title,notes,link,hidden,position) values ('c2-ref-3','c2','AHA + Communication','Communicate with bagger and breader','','',false,3);
 insert into public.items(id,category_id,section,title,notes,link,hidden,position) values ('c2-ref-4','c2','AHA + Communication','Follow the PAN system','','',false,4);
 insert into public.items(id,category_id,section,title,notes,link,hidden,position) values ('c2-ref-5','c2','AHA + Communication','Use AHA tracking','','',false,5);
+-- BOH Primary sandwich examples
+insert into public.items(id,category_id,section,title,position)
+select examples.id, station.id, 'Make', examples.title, examples.position
+from public.categories as station
+cross join (values
+ ('boh-primary-regular-sandwich','Regular CFA Sandwich',-2),
+ ('boh-primary-spicy-sandwich','Spicy CFA Sandwich',-1)
+) as examples(id,title,position)
+where station.id='c2' and station.department='BOH'
+on conflict (id) do nothing;
+-- End BOH Primary sandwich examples
 insert into public.items(id,category_id,section,title,notes,link,hidden,position) values ('c3-ref-0','c3','Orders','Use nugget/strip box tabs and labels correctly','','',false,0);
 insert into public.items(id,category_id,section,title,notes,link,hidden,position) values ('c3-ref-1','c3','Orders','Cobb/customized salads','','',false,1);
 insert into public.items(id,category_id,section,title,notes,link,hidden,position) values ('c3-ref-2','c3','Orders','Place items in correct chutes','','',false,2);

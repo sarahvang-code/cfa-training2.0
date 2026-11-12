@@ -1,7 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {TrainingStore,stats,seedReference} from '../store.js';
+import {getBohBuild,renderBuildDiagram} from '../boh-builds.js';
 const storage=()=>{const map=new Map();return {getItem:k=>map.get(k)||null,setItem:(k,v)=>map.set(k,v),removeItem:k=>map.delete(k)};};
+test('Primary starts with both Make items and only the filmed sandwich has an illustrated build',()=>{
+ const data=seedReference(),primary=data.categories.find(c=>c.department==='BOH'&&c.title==='Primary');
+ const items=data.items.filter(i=>i.category_id===primary.id).sort((a,b)=>a.position-b.position);
+ assert.deepEqual(items.slice(0,2).map(i=>[i.section,i.title]),[['Make','Regular CFA Sandwich'],['Make','Spicy CFA Sandwich']]);
+ assert.ok(items.some(i=>i.title==='Build sandwiches'));
+ const build=getBohBuild(items[0].id);
+ assert.deepEqual(build.steps,['Bottom bun','Pickles','Chicken filet','Top bun']);
+ assert.equal(getBohBuild(items[1].id),null);
+ for(let stage=1;stage<=build.steps.length;stage++){
+  const shown=[...renderBuildDiagram(items[0].id,stage).matchAll(/data-layer="(\d+)"/g)].map(m=>Number(m[1]));
+  assert.deepEqual(shown,Array.from({length:stage},(_,i)=>i+1));
+ }
+ assert.deepEqual(data.progress,[]);
+});
 test('reference includes both departments and BOH closing areas',()=>{const d=seedReference();assert.equal(d.categories.filter(c=>c.department==='BOH').length,9);assert.equal(d.categories.filter(c=>c.department==='FOH').length,8);const c=d.categories.find(c=>c.department==='BOH'&&c.title==='Closing');assert.deepEqual([...new Set(d.items.filter(i=>i.category_id===c.id).map(i=>i.section))],['Closing Boards','Closing Machines','Closing Breading Table','Closing Dishes']);});
 test('checklist progress persists and remains separate from overall training status',async()=>{const s=storage(),store=new TrainingStore(s);const member=store.data.members[0],item=store.data.items.find(i=>i.category_id==='c0');await store.save('progress',{member_id:member.id,item_id:item.id,status:'Trained'});const st=stats(store.data,member.id,item.category_id);assert.equal(st.trained,1);assert.equal(st.percent,33);await store.save('members',{...member,status_boh:'Trained'});assert.equal(stats(store.data,member.id,item.category_id).percent,33);const reopened=new TrainingStore(s);assert.equal(reopened.data.members[0].status_boh,'Trained');assert.equal(reopened.data.progress[0].status,'Trained');assert.equal(stats(reopened.data,member.id,null,'FOH').trained,0);});
 test('hiding excludes an item from totals and restoring preserves its progress',async()=>{const store=new TrainingStore(storage()),item=store.data.items.find(i=>i.category_id==='c0'),id=store.data.members[0].id;await store.save('progress',{member_id:id,item_id:item.id,status:'Trained'});await store.save('items',{...item,hidden:true});assert.equal(stats(store.data,id,item.category_id).trained,0);assert.equal(stats(store.data,id,item.category_id).total,2);await store.save('items',{...item,hidden:false});assert.equal(stats(store.data,id,item.category_id).trained,1);});
@@ -139,16 +154,22 @@ test('used email links give a recovery message without attempting to consume the
 });
 test('email rate limits distinguish a short resend cooldown from the project email cap',async()=>{
  const previous=globalThis.fetch,calls=[];
- const messages=['For security purposes, you can only request this after 17 seconds.','email rate limit exceeded'];
+ const errors=[
+  {code:429,error_code:'over_email_send_rate_limit',msg:'For security purposes, you can only request this after 17 seconds.'},
+  {code:'over_email_send_rate_limit',msg:'email rate limit exceeded'},
+  {message:'email rate limit exceeded'},
+  {code:429,error_code:'over_request_rate_limit',msg:'Too many requests'}
+ ];
  globalThis.fetch=async(url,options)=>{
   calls.push({url,options});
-  return new Response(JSON.stringify({code:'over_email_send_rate_limit',msg:messages.shift()}),{status:429});
+  return new Response(JSON.stringify(errors.shift()),{status:429});
  };
  try{
   const store=new TrainingStore(storage(),authConfig);
-  await assert.rejects(store.requestSignInLink('owner@example.com'),/Wait 17 seconds/);
-  await assert.rejects(store.requestSignInLink('owner@example.com'),/hourly sign-in email limit.*I already have a link or code/);
-  assert.equal(calls.length,2);assert.ok(calls.every(c=>c.url.endsWith('/auth/v1/otp')));
+  await assert.rejects(store.requestSignInLink('owner@example.com'),{code:'over_email_send_rate_limit',message:/Wait 17 seconds/});
+  for(let i=0;i<2;i++)await assert.rejects(store.requestSignInLink('owner@example.com'),{code:'over_email_send_rate_limit',message:/No new email was sent.*hourly limit/});
+  await assert.rejects(store.requestSignInLink('owner@example.com'),e=>!e.code&&e.message==='Too many requests');
+  assert.equal(calls.length,4);assert.ok(calls.every(c=>c.url.endsWith('/auth/v1/otp')));
   assert.equal(store.session,null);
  }finally{globalThis.fetch=previous;}
 });
