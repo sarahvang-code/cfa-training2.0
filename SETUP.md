@@ -6,7 +6,7 @@ The app is connected to the Supabase **Training App** project. FOH and BOH train
 
 The owner email has been approved privately in the database and its Auth identity has been verified. Select **Owner sign-in**, enter your approved email, and request a one-time sign-in email. Paste the email code or copy the original link from the email without opening it. If you already clicked the link and Safari could not open the page, copy the address from the Safari error tab and paste it into **I already have a link or code** in the app. The app checks the returned session with Supabase and does not request another email. Paste this address only in the app. If the address no longer contains an active sign-in, wait for any sending limit to reset and request a fresh email.
 
-For clicking an email link to return directly to the app, open the Training App project's Authentication → URL Configuration at https://supabase.com/dashboard/project/gclawgkpfgfgsavckwzx/auth/url-configuration. Set **Site URL** to `https://restaurant-training.jeremiahanguiano32.chatgpt.site/` and add that exact URL under **Redirect URLs**. The app requests this return address and handles the verified session automatically. The previous default `http://localhost:3000` caused successful email verification to return to a nonexistent local app. Changing the redirect does not revive a used link; request a new one afterward.
+For clicking an email link to return directly to the app, open the Training App project's Authentication → URL Configuration at https://supabase.com/dashboard/project/gclawgkpfgfgsavckwzx/auth/url-configuration. Set **Site URL** to the exact published app address, including its trailing slash, and add the same address under **Redirect URLs**. The app requests this return address and handles the verified session automatically. The previous default `http://localhost:3000` caused successful email verification to return to a nonexistent local app. Changing the redirect does not revive a used link; request a new one afterward.
 
 Email-link sign-in creates the underlying Supabase Auth identity on the first verified use. The database grants a role only to approved, confirmed email addresses. The app checks identity with Supabase Auth and loads the role from the database before showing owner tools. Visitors can browse checklists immediately; public viewers cannot edit records or access team progress. Keep Supabase's email confirmation enabled.
 
@@ -29,11 +29,11 @@ Visible examples in the recordings are starter content. Add your complete, appro
 
 ## Hosting and source
 
-Live app: https://restaurant-training.jeremiahanguiano32.chatgpt.site
+Live app: use the production URL assigned by your hosting service.
 
 GitHub draft source: https://github.com/sarahvang-code/cfa-training2.0/tree/restaurant-training-draft
 
-GitHub Pages has not been configured. To use Pages after approving the source branch, select that branch and `/ (root)` in repository Settings → Pages. Add its exact deployed URL to Supabase's Redirect URLs before using email-link callbacks on Pages. The static app uses relative paths and can work under the repository path. GitHub stores and serves code; training data is read and written directly through Supabase with the signed-in user's permissions.
+To publish on a static host, use the files at the root of the draft branch. The app needs no build step. Add the exact production URL to the Supabase redirect settings above before sharing it with leaders.
 
 For a fresh Supabase project, run `supabase-schema.sql`, then `supabase-account-access.sql`, then `supabase-public-view.sql`, once each. Do not rerun them against the configured Training App project. Use only a publishable API key in `config.js`; never a secret or service-role key. Invited emails and access grants are private database data, not public source configuration.
 
