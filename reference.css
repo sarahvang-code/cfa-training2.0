@@ -33,3 +33,5 @@
 .build-layer-enter{animation:build-layer-in 240ms ease-out both}
 @keyframes build-layer-in{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.build-layer-enter{animation:none}}
+
+.connection-status{flex-wrap:wrap}.connection-status .actions{margin-left:auto}.connection-status .actions .primary{font-size:12px;padding:7px 10px}

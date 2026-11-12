@@ -5,7 +5,7 @@ const starter=[['Clock in and meet your trainer','Restaurant tour','Uniform and 
 export function seed(){const categories=titles.map((title,i)=>({id:`c${i}`,title,description:i===0?'A great first day starts here.':'Practice the essentials with your trainer.',position:i}));const items=starter.flatMap((a,i)=>a.map((title,j)=>({id:`i${i}-${j}`,category_id:`c${i}`,section:i===0?'Welcome':'Station essentials',title,notes:'Example checklist item. Replace with your restaurant’s approved training.',link:'',position:j})));return {categories,items,members:[{id:'m1',name:'Alex Morgan',role:'Team member',auth_user_id:null},{id:'m2',name:'Jordan Lee',role:'Team member',auth_user_id:null},{id:'m3',name:'Taylor Reed',role:'Team member',auth_user_id:null}],progress:[],settings:{name:'Restaurant Training'}};}
 export function stats(data,memberId,categoryId,department){const categoryIds=data.categories.filter(c=>!department||c.department===department).map(c=>c.id);const items=data.items.filter(i=>!i.hidden&&categoryIds.includes(i.category_id)&&(!categoryId||i.category_id===categoryId));const trained=items.filter(i=>data.progress.some(p=>p.member_id===memberId&&p.item_id===i.id&&p.status==='Trained')).length;const started=items.filter(i=>data.progress.some(p=>p.member_id===memberId&&p.item_id===i.id&&p.status!=='Not started')).length;return {total:items.length,trained,started,percent:items.length?Math.round(trained/items.length*100):0,status:items.length&&trained===items.length?'Trained':started?'In Training':'Not started'};}
 export class TrainingStore{
- constructor(storage,config={}){this.storage=storage;this.config=config.url&&config.key?config:JSON.parse(storage.getItem('training-connection')||'{}');this.cloud=!!(this.config.url&&this.config.key);this.session=null;this.profile=null;this.data=this.cloud?{categories:[],items:[],members:[],progress:[],settings:{name:'Restaurant Training'}}:JSON.parse(storage.getItem('training-demo-v2')||'null')||seedReference();}
+ constructor(storage,config={},trainerStorage=storage,siteOrigin=globalThis.location?.origin){this.storage=storage;this.trainerStorage=trainerStorage;this.config=config.url&&config.key?config:JSON.parse(storage.getItem('training-connection')||'{}');this.cloud=!!(this.config.url&&this.config.key);this.trainerCodeEnabled=!!(this.cloud&&this.config.trainerCodeOrigin&&this.config.trainerCodeOrigin===siteOrigin);this.session=null;this.trainerSession=null;this.trainerLastLoad=0;this.profile=null;this.data=this.cloud?{categories:[],items:[],members:[],progress:[],settings:{name:'Restaurant Training'}}:JSON.parse(storage.getItem('training-demo-v2')||'null')||seedReference();}
  persist(){this.storage.setItem('training-demo-v2',JSON.stringify(this.data));}
  async renameSection(categoryId,oldName,newName){if(!this.canEdit())throw Error('Owner access required.');if(this.cloud){await this.request('/rest/v1/items?category_id=eq.'+encodeURIComponent(categoryId)+'&section=eq.'+encodeURIComponent(oldName),{method:'PATCH',body:{section:newName}});await this.load();}else{this.data.items.filter(i=>i.category_id===categoryId&&i.section===oldName).forEach(i=>i.section=newName);this.persist();}}
  configure(url,key){url=url.trim().replace(/\/$/,'');key=key.trim();if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url))throw Error('Enter your Supabase project URL (https://your-project.supabase.co).');let valid=key.startsWith('sb_publishable_');if(key.startsWith('eyJ')){try{valid=JSON.parse(atob(key.split('.')[1])).role==='anon';}catch{valid=false;}}if(!valid)throw Error('Use the publishable key or legacy anon key, never a secret/service-role key.');this.storage.setItem('training-connection',JSON.stringify({url,key}));}
@@ -101,6 +101,7 @@ export class TrainingStore{
  }
  async activateSession(value,email){
   if(!value.access_token)throw Error('Sign-in did not return a session. Request a new email.');
+  this.clearTrainerSession();
   this.session={...value,expires_at:value.expires_at||Date.now()/1000+(value.expires_in||3600)};this.profile=null;
   try{
    // Resolve identity with Auth; never trust a stored user or a role from a URL.
@@ -120,12 +121,114 @@ export class TrainingStore{
   if(stored.project!==this.config.url||!stored.session?.access_token){this.clearSession();return false;}
   await this.activateSession(stored.session);return true;
  }
- async logout(){try{if(this.session)await this.request('/auth/v1/logout',{method:'POST'});}finally{this.clearSession();await this.load();}}
- async load(){if(!this.cloud)return;const [categories,items,settings]=await Promise.all(['categories?order=position','items?order=position','settings'].map(t=>this.request('/rest/v1/'+t)));let members=[],progress=[];if(this.session&&this.profile)[members,progress]=await Promise.all(['members?order=name','progress'].map(t=>this.request('/rest/v1/'+t)));this.data={categories,items,members,progress,settings:settings[0]||{name:'Restaurant Training'}};}
+ async trainerRequest(action,input={}){
+  if(!this.trainerCodeEnabled)throw Error('Trainer code sign-in is available at the current training address.');
+  const session=this.trainerSession;
+  if(action!=='sign_in'&&(!session||session.expires_at<=Date.now()/1000)){
+   this.clearTrainerSession();
+   throw Error('Your trainer session expired. Enter the trainer code again.');
+  }
+  let response,value;
+  try{
+   response=await fetch(this.config.url+'/functions/v1/trainer-code',{
+    method:'POST',cache:'no-store',headers:{apikey:this.config.key,'Content-Type':'application/json'},
+    body:JSON.stringify({action,...input,...(action!=='sign_in'?{token:session.token}:{})}),
+   });
+   value=await response.json();
+  }catch{throw Error('Could not reach trainer sign-in. Check your connection and try again.');}
+  if(!response.ok){
+   if(response.status===401&&action!=='sign_in'){
+    this.clearTrainerSession();
+    throw Error('Your trainer session expired. Enter the trainer code again.');
+   }
+   if(response.status===429&&action==='sign_in'){
+    const seconds=Number(response.headers.get('Retry-After'));
+    if(Number.isFinite(seconds)&&seconds>0&&seconds<=86400){
+     const delay=seconds<=3600?Math.ceil(seconds/60)+' min':Math.ceil(seconds/3600)+' hr';
+     throw Error('Too many incorrect trainer codes. Try again in about '+delay+'.');
+    }
+   }
+   throw Error(value?.message||'Trainer access is temporarily unavailable. Try again in a moment.');
+  }
+  return value;
+ }
+ validTrainerSession(value){
+  return typeof value?.token==='string'&&/^[0-9a-f]{64}$/.test(value.token)&&Number.isSafeInteger(value.expires_at)&&value.expires_at>Date.now()/1000;
+ }
+ clearTrainerSession(){
+  if(this.trainerSession){
+   this.profile=null;this.data.members=[];this.data.progress=[];
+  }
+  this.trainerSession=null;this.trainerLastLoad=0;
+  this.trainerStorage.removeItem('training-trainer-session');
+ }
+ async signInWithTrainerCode(pin){
+  if(this.profile)throw Error('Sign out before starting a new trainer session.');
+  if(typeof pin!=='string'||!/^\d{5,12}$/.test(pin.trim()))throw Error('Enter the trainer code using digits only.');
+  const value=await this.trainerRequest('sign_in',{pin:pin.trim()});
+  if(!this.validTrainerSession(value))throw Error('Trainer sign-in did not return a valid session.');
+  this.trainerSession={token:value.token,expires_at:value.expires_at};
+  try{
+   await this.load();
+   if(!this.trainerSession)throw Error('The trainer session has expired. Try signing in again.');
+   this.trainerStorage.setItem('training-trainer-session',JSON.stringify({project:this.config.url,session:this.trainerSession}));
+  }catch(e){this.clearTrainerSession();throw e;}
+ }
+ async restoreTrainerSession(){
+  if(!this.trainerCodeEnabled||this.session)return false;
+  let stored;try{stored=JSON.parse(this.trainerStorage.getItem('training-trainer-session')||'null');}catch{this.clearTrainerSession();return false;}
+  if(stored?.project!==this.config.url||!this.validTrainerSession(stored.session)){this.clearTrainerSession();return false;}
+  this.trainerSession=stored.session;
+  try{await this.load();return this.profile?.role==='trainer';}
+  catch{this.clearTrainerSession();return false;}
+ }
+ async logout(){
+  if(this.trainerSession){
+   try{await this.trainerRequest('sign_out');}finally{this.clearTrainerSession();await this.load();}
+   return;
+  }
+  try{if(this.session)await this.request('/auth/v1/logout',{method:'POST'});}finally{this.clearSession();await this.load();}
+ }
+ async load(){
+  if(!this.cloud)return;
+  const trainer=this.trainerSession;
+  const [categories,items,settings]=await Promise.all(['categories?order=position','items?order=position','settings'].map(t=>this.request('/rest/v1/'+t)));
+  let members=[],progress=[];
+  if(trainer&&this.trainerSession===trainer){
+   try{
+    const team=await this.trainerRequest('team');
+    if(!Array.isArray(team?.members)||!Array.isArray(team?.progress))throw Error('Could not load team progress.');
+    if(this.trainerSession===trainer){
+     ({members,progress}=team);this.profile={role:'trainer'};this.trainerLastLoad=Date.now();
+    }
+   }catch(e){if(this.trainerSession)throw e;}
+  }else if(this.session&&this.profile){
+   [members,progress]=await Promise.all(['members?order=name','progress'].map(t=>this.request('/rest/v1/'+t)));
+  }
+  this.data={categories,items,members,progress,settings:settings[0]||{name:'Restaurant Training'}};
+ }
  canEdit(){return !this.cloud||this.profile?.role==='owner';}
  canTrain(){return !this.cloud||['owner','trainer'].includes(this.profile?.role);}
- async save(table,row){if(table==='progress'&&!this.canTrain())throw Error('Only trainers and owners can record progress.');if(['categories','items','settings'].includes(table)&&!this.canEdit())throw Error('Only the owner can edit training.');if(table==='members'&&!this.canTrain())throw Error('Only trainers and owners can manage team members.');if(this.cloud){await this.request('/rest/v1/'+table+(table==='progress'?'?on_conflict=member_id,item_id':''),{method:'POST',body:row,prefer:'resolution=merge-duplicates,return=representation'});await this.load();return;}if(table==='settings')this.data.settings=row;else{const rows=this.data[table];const index=rows.findIndex(r=>table==='progress'?r.member_id===row.member_id&&r.item_id===row.item_id:r.id===row.id);if(index<0)rows.push(row);else rows[index]={...rows[index],...row};}this.persist();}
- async remove(table,id){if(table==='members'?!this.canTrain():!this.canEdit())throw Error('You do not have permission to delete this record.');if(this.cloud){await this.request(`/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`,{method:'DELETE'});await this.load();return;}this.data[table]=this.data[table].filter(r=>r.id!==id);if(table==='categories'){const removed=this.data.items.filter(i=>i.category_id===id).map(i=>i.id);this.data.items=this.data.items.filter(i=>i.category_id!==id);this.data.progress=this.data.progress.filter(p=>!removed.includes(p.item_id));}if(table==='items')this.data.progress=this.data.progress.filter(p=>p.item_id!==id);if(table==='members')this.data.progress=this.data.progress.filter(p=>p.member_id!==id);this.persist();}
+ canManageTeam(){return this.canTrain()&&!this.trainerSession;}
+ async recordProgress(memberId,itemId,status){
+  if(!this.canTrain())throw Error('Only trainers and owners can record progress.');
+  if(this.trainerSession){
+   await this.trainerRequest('save_progress',{member_id:memberId,item_id:itemId,status});await this.load();return;
+  }
+  await this.save('progress',{member_id:memberId,item_id:itemId,status,updated_at:new Date().toISOString(),
+   ...(this.session?.user?.id?{recorded_by:this.session.user.id}:{})});
+ }
+ async setOverallStatus(memberId,department,status){
+  if(!this.canTrain())throw Error('Only trainers and owners can record progress.');
+  if(this.trainerSession){
+   await this.trainerRequest('save_overall',{member_id:memberId,department,status});await this.load();return;
+  }
+  const member=this.data.members.find(m=>m.id===memberId);
+  if(!member)throw Error('This team member could not be found.');
+  await this.save('members',{...member,['status_'+department.toLowerCase()]:status});
+ }
+ async save(table,row){if(table==='progress'&&!this.canTrain())throw Error('Only trainers and owners can record progress.');if(['categories','items','settings'].includes(table)&&!this.canEdit())throw Error('Only the owner can edit training.');if(table==='members'&&!this.canManageTeam())throw Error(this.trainerSession?'The shared trainer code cannot manage team members.':'Only trainers and owners can manage team members.');if(this.cloud){await this.request('/rest/v1/'+table+(table==='progress'?'?on_conflict=member_id,item_id':''),{method:'POST',body:row,prefer:'resolution=merge-duplicates,return=representation'});await this.load();return;}if(table==='settings')this.data.settings=row;else{const rows=this.data[table];const index=rows.findIndex(r=>table==='progress'?r.member_id===row.member_id&&r.item_id===row.item_id:r.id===row.id);if(index<0)rows.push(row);else rows[index]={...rows[index],...row};}this.persist();}
+ async remove(table,id){if(table==='members'?!this.canManageTeam():!this.canEdit())throw Error('You do not have permission to delete this record.');if(this.cloud){await this.request(`/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`,{method:'DELETE'});await this.load();return;}this.data[table]=this.data[table].filter(r=>r.id!==id);if(table==='categories'){const removed=this.data.items.filter(i=>i.category_id===id).map(i=>i.id);this.data.items=this.data.items.filter(i=>i.category_id!==id);this.data.progress=this.data.progress.filter(p=>!removed.includes(p.item_id));}if(table==='items')this.data.progress=this.data.progress.filter(p=>p.item_id!==id);if(table==='members')this.data.progress=this.data.progress.filter(p=>p.member_id!==id);this.persist();}
 }
 export function seedReference(){
  const data=seed();data.categories.forEach(c=>c.department='BOH');data.items.forEach(i=>i.hidden=false);data.members.forEach(m=>{m.status_boh='In Training';m.status_foh='In Training';});
