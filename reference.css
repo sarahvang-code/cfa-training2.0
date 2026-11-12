@@ -35,3 +35,23 @@
 @media(prefers-reduced-motion:reduce){.build-layer-enter{animation:none}}
 
 .connection-status{flex-wrap:wrap}.connection-status .actions{margin-left:auto}.connection-status .actions .primary{font-size:12px;padding:7px 10px}
+
+.roster-group-heading{display:flex;align-items:center;gap:9px;margin:25px 0 12px;font-size:17px}
+.roster-group-heading span,.roster-department{display:inline-flex;border-radius:999px;padding:4px 9px;background:#f0edec;color:#615b5d;font-size:11px;font-weight:700}
+.roster-department{margin-top:5px}
+.team-progress .panel-heading>div{min-width:0}
+.team-progress .panel-heading{gap:10px;align-items:flex-start}
+.team-progress .panel-heading button{white-space:normal;flex-shrink:0;font-size:12px;padding:7px 10px;max-width:45%}
+.team-progress .panel-heading .roster-name{display:flex;align-items:center;flex-wrap:wrap;gap:5px 8px;overflow-wrap:anywhere;font-size:16px}
+.cross-trained{display:inline-flex;align-items:center;gap:4px;border:1px solid #f0d7df;border-radius:999px;background:#fff4f7;color:#842743;padding:1px 7px 1px 3px;font-size:11px;font-weight:700;white-space:nowrap}
+.cross-trained svg{display:block;flex:none}
+.team-meter{border-radius:12px;background:#f9f6f5;padding:11px 12px;margin:0 0 12px}
+.team-progress .team-meter{margin:12px 0}
+.meter-line{display:flex;justify-content:space-between;gap:12px;align-items:baseline;font-size:12px;color:#625c5e;margin-bottom:7px}
+.meter-line strong{color:#8e1c36;font-size:15px}
+.team-meter progress{display:block;width:100%;height:9px;appearance:none;-webkit-appearance:none;border:0;border-radius:999px;background:#eadfe0;overflow:hidden;accent-color:var(--red)}
+.team-meter progress::-webkit-progress-bar{background:#eadfe0;border-radius:999px}
+.team-meter progress::-webkit-progress-value{background:var(--red);border-radius:999px}
+.team-meter progress::-moz-progress-bar{background:var(--red);border-radius:999px}
+.overall-control{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12px;font-weight:600}
+.overall-control select{margin:0}

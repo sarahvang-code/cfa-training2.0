@@ -4,6 +4,21 @@ export const titles=['Welcome & Restaurant Tour','BOH Food Safety','Primary','Se
 const starter=[['Clock in and meet your trainer','Restaurant tour','Uniform and handwashing expectations'],['Handwashing and glove use','Temperature checks','Prevent cross-contamination'],['Set up the primary station','Practice order assembly'],['Set up the secondary station','Practice station handoffs'],['Equipment overview','Safe operation and cleaning'],['Prepare the breading station','Review safe handling'],['Prepare the fry station','Review timers and holding procedures'],['Review restaurant safety expectations','Complete the trainer assessment'],['Complete station cleaning','Review the closing checklist']];
 export function seed(){const categories=titles.map((title,i)=>({id:`c${i}`,title,description:i===0?'A great first day starts here.':'Practice the essentials with your trainer.',position:i}));const items=starter.flatMap((a,i)=>a.map((title,j)=>({id:`i${i}-${j}`,category_id:`c${i}`,section:i===0?'Welcome':'Station essentials',title,notes:'Example checklist item. Replace with your restaurant’s approved training.',link:'',position:j})));return {categories,items,members:[{id:'m1',name:'Alex Morgan',role:'Team member',auth_user_id:null},{id:'m2',name:'Jordan Lee',role:'Team member',auth_user_id:null},{id:'m3',name:'Taylor Reed',role:'Team member',auth_user_id:null}],progress:[],settings:{name:'Restaurant Training'}};}
 export function stats(data,memberId,categoryId,department){const categoryIds=data.categories.filter(c=>!department||c.department===department).map(c=>c.id);const items=data.items.filter(i=>!i.hidden&&categoryIds.includes(i.category_id)&&(!categoryId||i.category_id===categoryId));const trained=items.filter(i=>data.progress.some(p=>p.member_id===memberId&&p.item_id===i.id&&p.status==='Trained')).length;const started=items.filter(i=>data.progress.some(p=>p.member_id===memberId&&p.item_id===i.id&&p.status!=='Not started')).length;return {total:items.length,trained,started,percent:items.length?Math.round(trained/items.length*100):0,status:items.length&&trained===items.length?'Trained':started?'In Training':'Not started'};}
+export const trainingAreas=Object.freeze(['FOH','BOH','BOTH']);
+export function memberTrainingArea(member){return trainingAreas.includes(member?.training_area)?member.training_area:'UNASSIGNED';}
+export function memberInDepartment(member,department){
+ if(!member||!['FOH','BOH'].includes(department))return false;
+ return [department,'BOTH','UNASSIGNED'].includes(memberTrainingArea(member));
+}
+export function isCrossTrained(member){
+ return memberTrainingArea(member)==='BOTH'&&member.status_foh==='Trained'&&member.status_boh==='Trained';
+}
+function teamMemberFields(name,trainingArea,allowUnassigned=false){
+ name=typeof name==='string'?name.trim().replace(/\s+/g,' '):'';
+ if(!name||Array.from(name).length>100)throw Error('Enter a team member name with up to 100 characters.');
+ if(!trainingAreas.includes(trainingArea)&&!(allowUnassigned&&trainingArea==='UNASSIGNED'))throw Error('Choose FOH, BOH, or both departments.');
+ return {name,training_area:trainingArea};
+}
 export class TrainingStore{
  constructor(storage,config={},trainerStorage=storage,siteOrigin=globalThis.location?.origin){this.storage=storage;this.trainerStorage=trainerStorage;this.config=config.url&&config.key?config:JSON.parse(storage.getItem('training-connection')||'{}');this.cloud=!!(this.config.url&&this.config.key);this.trainerCodeEnabled=!!(this.cloud&&this.config.trainerCodeOrigin&&this.config.trainerCodeOrigin===siteOrigin);this.session=null;this.trainerSession=null;this.trainerLastLoad=0;this.profile=null;this.data=this.cloud?{categories:[],items:[],members:[],progress:[],settings:{name:'Restaurant Training'}}:JSON.parse(storage.getItem('training-demo-v2')||'null')||seedReference();}
  persist(){this.storage.setItem('training-demo-v2',JSON.stringify(this.data));}
@@ -210,6 +225,41 @@ export class TrainingStore{
  canEdit(){return !this.cloud||this.profile?.role==='owner';}
  canTrain(){return !this.cloud||['owner','trainer'].includes(this.profile?.role);}
  canManageTeam(){return this.canTrain()&&!this.trainerSession;}
+ async addTeamMember(name,trainingArea,position='Team member'){
+  if(!this.canTrain())throw Error('Sign in as a trainer or owner to add a team member.');
+  const row=teamMemberFields(name,trainingArea);
+  if(this.trainerSession){
+   const result=await this.trainerRequest('add_member',row);
+   if(typeof result?.id!=='string'||!result.id)throw Error('Could not confirm the new team member.');
+   await this.load();return result.id;
+  }
+  const id=crypto.randomUUID();
+  await this.save('members',{id,...row,role:position.trim()||'Team member',auth_user_id:null,status_boh:'In Training',status_foh:'In Training'});
+  return id;
+ }
+ async assignMemberDepartment(id,trainingArea){
+  if(!this.canTrain())throw Error('Sign in as a trainer or owner to change departments.');
+  if(!trainingAreas.includes(trainingArea))throw Error('Choose FOH, BOH, or both departments.');
+  if(this.trainerSession){
+   await this.trainerRequest('assign_department',{member_id:id,training_area:trainingArea});await this.load();return;
+  }
+  await this.updateMemberFields(id,{training_area:trainingArea});
+ }
+ async editTeamMember(id,name,trainingArea,position){
+  if(!this.canManageTeam())throw Error('This sign-in cannot edit a team member’s name.');
+  await this.updateMemberFields(id,{...teamMemberFields(name,trainingArea,true),role:position.trim()||'Team member'});
+ }
+ async updateMemberFields(id,fields){
+  if(!this.canManageTeam())throw Error('This sign-in cannot edit team member details.');
+  const member=this.data.members.find(m=>m.id===id);
+  if(!member)throw Error('This team member could not be found.');
+  if(this.cloud){
+   const updated=await this.request('/rest/v1/members?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:fields});
+   if(!Array.isArray(updated)||!updated.length)throw Error('This team member could not be updated.');
+   await this.load();return;
+  }
+  await this.save('members',{...member,...fields});
+ }
  async recordProgress(memberId,itemId,status){
   if(!this.canTrain())throw Error('Only trainers and owners can record progress.');
   if(this.trainerSession){
@@ -223,9 +273,8 @@ export class TrainingStore{
   if(this.trainerSession){
    await this.trainerRequest('save_overall',{member_id:memberId,department,status});await this.load();return;
   }
-  const member=this.data.members.find(m=>m.id===memberId);
-  if(!member)throw Error('This team member could not be found.');
-  await this.save('members',{...member,['status_'+department.toLowerCase()]:status});
+  if(!['FOH','BOH'].includes(department)||!['In Training','Trained'].includes(status))throw Error('Choose a valid training status.');
+  await this.updateMemberFields(memberId,{['status_'+department.toLowerCase()]:status});
  }
  async save(table,row){if(table==='progress'&&!this.canTrain())throw Error('Only trainers and owners can record progress.');if(['categories','items','settings'].includes(table)&&!this.canEdit())throw Error('Only the owner can edit training.');if(table==='members'&&!this.canManageTeam())throw Error(this.trainerSession?'The shared trainer code cannot manage team members.':'Only trainers and owners can manage team members.');if(this.cloud){await this.request('/rest/v1/'+table+(table==='progress'?'?on_conflict=member_id,item_id':''),{method:'POST',body:row,prefer:'resolution=merge-duplicates,return=representation'});await this.load();return;}if(table==='settings')this.data.settings=row;else{const rows=this.data[table];const index=rows.findIndex(r=>table==='progress'?r.member_id===row.member_id&&r.item_id===row.item_id:r.id===row.id);if(index<0)rows.push(row);else rows[index]={...rows[index],...row};}this.persist();}
  async remove(table,id){if(table==='members'?!this.canManageTeam():!this.canEdit())throw Error('You do not have permission to delete this record.');if(this.cloud){await this.request(`/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`,{method:'DELETE'});await this.load();return;}this.data[table]=this.data[table].filter(r=>r.id!==id);if(table==='categories'){const removed=this.data.items.filter(i=>i.category_id===id).map(i=>i.id);this.data.items=this.data.items.filter(i=>i.category_id!==id);this.data.progress=this.data.progress.filter(p=>!removed.includes(p.item_id));}if(table==='items')this.data.progress=this.data.progress.filter(p=>p.item_id!==id);if(table==='members')this.data.progress=this.data.progress.filter(p=>p.member_id!==id);this.persist();}

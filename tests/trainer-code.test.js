@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {TrainingStore} from '../store.js';
+import {TrainingStore,isCrossTrained,memberInDepartment,stats} from '../store.js';
 import {createTrainerHandler} from '../supabase/functions/trainer-code/index.js';
 
 const origin = 'https://cfatulare.onrender.com';
@@ -126,4 +126,73 @@ test('incorrect codes never grant trainer access and revoked sessions drop priva
  assert.deepEqual(store.data.members,[]);
  assert.deepEqual(store.data.progress,[]);
  assert.equal(browser.getItem('training-trainer-session'),null);
+});
+
+test('roster calls require a trainer session and only forward name and department fields',async()=>{
+ const calls=[],created='0cc49262-dcfe-48ca-82d8-ed2efade17f2';
+ const handle=createTrainerHandler({
+  projectUrl:config.url,serviceKey:'test-server-only',transport:async(url,opts)=>{
+   const payload=JSON.parse(opts.body);calls.push(payload);
+   return json(payload.p_action==='add_member'?{id:created}:{ok:true});
+  },
+ });
+ const add={action:'add_member',name:'  Test   Person  ',training_area:'BOTH',auth_user_id:'unexpected',role:'owner',status_foh:'Trained'};
+ assert.equal((await handle(req(add))).status,401);
+ assert.equal((await handle(req({...add,token,name:' '}))).status,400);
+ assert.equal((await handle(req({...add,token,training_area:'UNASSIGNED'}))).status,400);
+ assert.deepEqual(await (await handle(req({...add,token}))).json(),{id:created});
+ assert.deepEqual(await (await handle(req({action:'assign_department',token,member_id:created,training_area:'BOH',name:'ignored'}))).json(),{ok:true});
+ assert.deepEqual(calls,[
+  {p_action:'add_member',p_data:{token,name:'Test Person',training_area:'BOTH'}},
+  {p_action:'assign_department',p_data:{token,member_id:created,training_area:'BOH'}},
+ ]);
+});
+
+test('a signed-in trainer can add and reassign people without owner or roster delete permissions',async t=>{
+ const calls=[],members=[];
+ t.mock.method(globalThis,'fetch',async(url,opts)=>{
+  if(url!==endpoint)return json([]);
+  const body=JSON.parse(opts.body);calls.push(body);
+  if(body.action==='sign_in')return json(session());
+  if(body.action==='team')return json({members,progress:[]});
+  if(body.action==='add_member'){members.push({id:'new',name:body.name,training_area:body.training_area});return json({id:'new'});}
+  if(body.action==='assign_department'){members[0].training_area=body.training_area;return json({ok:true});}
+  assert.fail('Unexpected action: '+body.action);
+ });
+ const store=new TrainingStore(memory(),config,memory(),origin);
+ await assert.rejects(store.addTeamMember('Test Person','FOH'),/Sign in/);
+ await store.signInWithTrainerCode(fixturePin);
+ await assert.rejects(store.addTeamMember('Test Person','UNKNOWN'),/Choose FOH/);
+ const id=await store.addTeamMember(' Test   Person ','FOH','Ignored');
+ assert.equal(id,'new');
+ await store.assignMemberDepartment(id,'BOTH');
+ assert.equal(store.data.members[0].training_area,'BOTH');
+ await assert.rejects(store.editTeamMember(id,'Other Person','BOTH','Leader'),/cannot edit/);
+ await assert.rejects(store.remove('members',id),/permission/);
+ assert.equal(store.canEdit(),false);
+ assert.deepEqual(calls.filter(c=>c.action==='add_member'||c.action==='assign_department'),[
+  {action:'add_member',name:'Test Person',training_area:'FOH',token},
+  {action:'assign_department',member_id:'new',training_area:'BOTH',token},
+ ]);
+});
+
+test('roster filtering, cross-training, and per-department counts preserve legacy data',()=>{
+ const foh={id:'a',training_area:'FOH',status_foh:'Trained',status_boh:'Trained'};
+ const dual={...foh,training_area:'BOTH',status_boh:'In Training'};
+ assert.equal(memberInDepartment(foh,'FOH'),true);
+ assert.equal(memberInDepartment(foh,'BOH'),false);
+ assert.equal(memberInDepartment(dual,'FOH'),true);
+ assert.equal(memberInDepartment(dual,'BOH'),true);
+ assert.equal(memberInDepartment({id:'old'},'FOH'),true);
+ assert.equal(memberInDepartment({id:'old'},'BOH'),true);
+ assert.equal(isCrossTrained(foh),false);
+ assert.equal(isCrossTrained(dual),false);
+ assert.equal(isCrossTrained({...dual,status_boh:'Trained'}),true);
+ const data={
+  categories:[{id:'f',department:'FOH'},{id:'b',department:'BOH'}],
+  items:[{id:'f1',category_id:'f'},{id:'f2',category_id:'f'},{id:'f3',category_id:'f',hidden:true},{id:'b1',category_id:'b'}],
+  progress:[{member_id:'a',item_id:'f1',status:'Trained'},{member_id:'a',item_id:'f3',status:'Trained'},{member_id:'a',item_id:'b1',status:'Trained'}],
+ };
+ assert.equal(stats(data,'a',null,'FOH').percent,50);
+ assert.equal(stats(data,'a',null,'BOH').percent,100);
 });

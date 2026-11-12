@@ -1,9 +1,11 @@
 const SITE = 'https://cfatulare.onrender.com';
-const ACTIONS = new Set(['sign_in', 'sign_out', 'team', 'save_progress', 'save_overall']);
+const ACTIONS = new Set(['sign_in', 'sign_out', 'team', 'save_progress', 'save_overall', 'add_member', 'assign_department']);
+const TRAINING_AREAS = new Set(['FOH', 'BOH', 'BOTH']);
 const ERRORS = {
   invalid_request: [400, 'Check the code or training entry and try again.'],
   invalid_code: [401, 'That trainer code is incorrect.'],
   session_expired: [401, 'Your trainer session expired. Enter the trainer code again.'],
+  wrong_department: [409, 'This trainee or checklist is no longer in the selected department. Refresh and try again.'],
   limited: [429, 'Too many incorrect trainer codes. Try again later.'],
   unavailable: [503, 'Trainer sign-in is temporarily unavailable. Try again in a moment.'],
 };
@@ -61,7 +63,15 @@ export function createTrainerHandler({projectUrl, serviceKey, transport = fetch}
     } else {
       if (typeof data.token !== 'string' || !/^[0-9a-f]{64}$/.test(data.token)) return fail('session_expired');
       input.token = data.token;
-      if (action === 'save_progress' || action === 'save_overall') {
+      if (action === 'add_member') {
+        const name = typeof data.name === 'string' ? data.name.trim().replace(/\s+/g, ' ') : '';
+        if (!name || Array.from(name).length > 100 || !TRAINING_AREAS.has(data.training_area)) {
+          return fail('invalid_request');
+        }
+        input.name = name;
+        input.training_area = data.training_area;
+      }
+      if (action === 'save_progress' || action === 'save_overall' || action === 'assign_department') {
         if (typeof data.member_id !== 'string' || !data.member_id || data.member_id.length > 160) {
           return fail('invalid_request');
         }
@@ -70,13 +80,17 @@ export function createTrainerHandler({projectUrl, serviceKey, transport = fetch}
           if (typeof data.item_id !== 'string' || !data.item_id || data.item_id.length > 160 ||
               !['Not started','In Training','Trained'].includes(data.status)) return fail('invalid_request');
           input.item_id = data.item_id;
-        } else {
+          input.status = data.status;
+        } else if (action === 'save_overall') {
           if (!['BOH','FOH'].includes(data.department) || !['In Training','Trained'].includes(data.status)) {
             return fail('invalid_request');
           }
           input.department = data.department;
+          input.status = data.status;
+        } else {
+          if (!TRAINING_AREAS.has(data.training_area)) return fail('invalid_request');
+          input.training_area = data.training_area;
         }
-        input.status = data.status;
       }
     }
     if (!projectUrl || !serviceKey) return fail('unavailable');
@@ -100,7 +114,12 @@ export function createTrainerHandler({projectUrl, serviceKey, transport = fetch}
       if (action === 'team' && Array.isArray(result?.members) && Array.isArray(result?.progress)) {
         return send(200, {members:result.members, progress:result.progress});
       }
-      if (action !== 'sign_in' && action !== 'team' && result?.ok === true) return send(200, {ok:true});
+      if (action === 'add_member' && typeof result?.id === 'string' && /^[0-9a-f-]{36}$/.test(result.id)) {
+        return send(200, {id:result.id});
+      }
+      if (['sign_out','save_progress','save_overall','assign_department'].includes(action) && result?.ok === true) {
+        return send(200, {ok:true});
+      }
     } catch { /* Do not log request bodies, credentials, or upstream results. */ }
     return fail('unavailable');
   };
