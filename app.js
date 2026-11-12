@@ -44,17 +44,17 @@ function ownerLogin(email=localStorage.getItem('training-pending-email')||'',err
  modal('Owner sign-in',form('<p class="helper">Enter your approved owner or trainer email. No password is needed.</p>'+field('Email','email',email,'email',true)+'<button type="button" id="existing-sign-in">I already have a link or code</button>','Send sign-in email'),async f=>{
   const email=f.get('email').trim();await store.requestSignInLink(email,new URL('./',location.href).href);
   localStorage.setItem('training-pending-email',email);
-  if(dialog.open)ownerVerification(email);
+  if(dialog.open)ownerVerification(email,true);
   return false;
  });
  dialog.querySelector('#existing-sign-in').onclick=()=>{const input=dialog.querySelector('[name=email]');if(input.reportValidity())ownerVerification(input.value.trim());};
  if(error)dialog.querySelector('.form-error').textContent=error;
 }
-function ownerVerification(email){
- modal('Check your email',form('<p class="helper">Email sent to <strong>'+esc(email)+'</strong>. Paste the email code, or copy the sign-in link from the email without opening it and paste it below.</p><p class="helper">Use the newest email. Each link or code works once.</p>'+field('Email code or sign-in link','verification','','text',true)+'<button type="button" id="new-sign-in">Request a new email</button>','Verify and sign in'),async f=>{
+function ownerVerification(email,emailJustSent=false){
+ modal('Finish sign-in',form('<p class="helper">'+(emailJustSent?'Email sent to ':'Signing in as ')+'<strong>'+esc(email)+'</strong>. Paste your email code or copy the link from the newest email without opening it.</p><p class="helper">Already clicked it and got a Safari error? Copy the address from that Safari tab and paste it below.</p>'+field('Email code or sign-in link','verification','','text',true)+'<button type="button" id="new-sign-in">Request a new email</button>','Verify and sign in'),async f=>{
   await store.verifySignIn(email,f.get('verification'));localStorage.removeItem('training-pending-email');page='training';categoryId=null;memberId='';
  },'Signed in successfully.');
- dialog.querySelector('[name=verification]').autocomplete='one-time-code';
+ const verification=dialog.querySelector('[name=verification]');verification.autocomplete='one-time-code';verification.spellcheck=false;verification.setAttribute('autocapitalize','off');
  dialog.querySelector('#new-sign-in').onclick=()=>ownerLogin(email);
 }
 async function initializeTraining(){

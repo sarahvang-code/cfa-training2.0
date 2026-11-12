@@ -137,3 +137,45 @@ test('used email links give a recovery message without attempting to consume the
   assert.equal(store.session,null);assert.equal(store.canEdit(),false);
  }finally{globalThis.fetch=previous;}
 });
+test('email rate limits distinguish a short resend cooldown from the project email cap',async()=>{
+ const previous=globalThis.fetch,calls=[];
+ const messages=['For security purposes, you can only request this after 17 seconds.','email rate limit exceeded'];
+ globalThis.fetch=async(url,options)=>{
+  calls.push({url,options});
+  return new Response(JSON.stringify({code:'over_email_send_rate_limit',msg:messages.shift()}),{status:429});
+ };
+ try{
+  const store=new TrainingStore(storage(),authConfig);
+  await assert.rejects(store.requestSignInLink('owner@example.com'),/Wait 17 seconds/);
+  await assert.rejects(store.requestSignInLink('owner@example.com'),/hourly sign-in email limit.*I already have a link or code/);
+  assert.equal(calls.length,2);assert.ok(calls.every(c=>c.url.endsWith('/auth/v1/otp')));
+  assert.equal(store.session,null);
+ }finally{globalThis.fetch=previous;}
+});
+test('a Safari error address completes the existing verified owner session without sending an email',async()=>{
+ const previous=globalThis.fetch,calls=[],s=storage(),expiresAt=Math.floor(Date.now()/1000)+1800;
+ globalThis.fetch=async(url,options)=>{calls.push({url,options});return ownerResponse(url);};
+ try{
+  const store=new TrainingStore(s,authConfig);
+  await store.verifySignIn('owner@example.com','http://localhost:3000/#access_token=test-access&refresh_token=test-refresh&expires_at='+expiresAt+'&type=magiclink');
+  assert.equal(store.canEdit(),true);
+  assert.equal(JSON.parse(s.getItem('training-owner-session')).session.expires_at,expiresAt);
+  assert.ok(calls.every(c=>c.url.startsWith(authConfig.url+'/')&&c.options.method==='GET'));
+  assert.ok(calls.some(c=>c.url.endsWith('/auth/v1/user')&&c.options.headers.Authorization==='Bearer test-access'));
+  assert.ok(calls.some(c=>c.url.includes('/access_users?user_id=eq.owner-id')));
+ }finally{globalThis.fetch=previous;}
+});
+test('Safari recovery rejects incomplete, expired, foreign, and wrong-email sign-ins',async()=>{
+ const previous=globalThis.fetch,calls=[],s=storage(),hash='#access_token=test-access&refresh_token=test-refresh&type=magiclink';
+ globalThis.fetch=async(url,options)=>{calls.push({url,options});return ownerResponse(url);};
+ try{
+  const store=new TrainingStore(s,authConfig);
+  await assert.rejects(store.verifySignIn('owner@example.com','http://localhost:3000/#error=access_denied'),/does not contain an active/);
+  await assert.rejects(store.verifySignIn('owner@example.com','http://localhost:3000/'+hash+'&expires_at=1'),/Safari sign-in has expired/);
+  await assert.rejects(store.verifySignIn('owner@example.com','https://other.example.com/'+hash),/original sign-in link/);
+  assert.equal(calls.length,0);
+  await assert.rejects(store.verifySignIn('other@example.com','http://localhost:3000/'+hash),/different email/);
+  assert.equal(store.canEdit(),false);assert.equal(s.getItem('training-owner-session'),null);
+  assert.ok(calls.every(c=>c.options.method==='GET'&&!c.url.includes('/access_users')));
+ }finally{globalThis.fetch=previous;}
+});

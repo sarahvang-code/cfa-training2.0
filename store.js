@@ -13,8 +13,14 @@ export class TrainingStore{
   const text=await r.text();let value;
   try{value=text?JSON.parse(text):{};}catch{throw Error('Could not reach sign-in. Please try again.');}
   if(!r.ok){
-   if(value.code==='otp_expired'||value.error_code==='otp_expired')throw Error('That sign-in link or code has already been used or has expired. Request a new email and use its latest link or code.');
-   throw Error(value.msg||value.message||value.error_description||'Sign-in failed. Please try again.');
+   const code=value.code||value.error_code,message=value.msg||value.message||value.error_description||'Sign-in failed. Please try again.';
+   if(r.status===429&&path.split('?')[0]==='/auth/v1/otp'&&code==='over_email_send_rate_limit'){
+    const seconds=String(message).match(/after\s+(\d+)\s+seconds?\b/i)?.[1];
+    if(seconds)throw Error(`Wait ${seconds} seconds before requesting another email. You can still use a link you already have.`);
+    throw Error('The hourly sign-in email limit has been reached. Choose “I already have a link or code” to use an existing sign-in, or try again later.');
+   }
+   if(code==='otp_expired')throw Error('That sign-in link or code has already been used or has expired. If it opened a Safari error page, paste the address from that tab here.');
+   throw Error(message);
   }
   return value;
  }
@@ -53,7 +59,14 @@ export class TrainingStore{
   if(/^\d{6,10}$/.test(code))body={email:email.trim(),token:code,type:'email'};
   else{
    let url;try{url=new URL(input);}catch{throw Error('Paste the sign-in link from your email, or the email code.');}
-   if(url.origin!==this.config.url||url.pathname!=='/auth/v1/verify')throw Error('Copy the original sign-in link from your email. If you already opened it, request a new email.');
+   if(url.origin==='http://localhost:3000'&&url.pathname==='/'&&!url.username&&!url.password){
+    const params=new URLSearchParams(url.hash.slice(1));
+    if(!params.get('access_token')||!params.get('refresh_token')||!['email','magiclink','signup'].includes(params.get('type')||'email'))throw Error('This Safari address does not contain an active email sign-in. Try the original Safari tab or an unused email link.');
+    // Read the returned session locally, then verify it with this project's Auth service.
+    await this.handleAuthCallback(url.href,email);
+    return;
+   }
+   if(url.origin!==this.config.url||url.pathname!=='/auth/v1/verify')throw Error('Copy the original sign-in link from your email, or the address of the Safari error page it opened.');
    const token_hash=url.searchParams.get('token_hash')||url.searchParams.get('token'),type=url.searchParams.get('type')||'email';
    if(!token_hash||!['email','magiclink','signup'].includes(type))throw Error('That link is not a valid email sign-in link.');
    body={token_hash,type};
@@ -61,7 +74,7 @@ export class TrainingStore{
   const value=await this.authRequest('/auth/v1/verify',body);
   await this.activateSession(value,email);
  }
- async handleAuthCallback(input){
+ async handleAuthCallback(input,email){
   const url=new URL(input),params=new URLSearchParams(url.hash.slice(1));
   const error=params.get('error_description')||url.searchParams.get('error_description');
   if(error){
@@ -71,13 +84,16 @@ export class TrainingStore{
   const access_token=params.get('access_token'),refresh_token=params.get('refresh_token');
   if(access_token&&refresh_token){
    if(params.get('type')==='recovery')throw Error('Use an owner sign-in email, rather than a password reset link.');
-   await this.activateSession({access_token,refresh_token,expires_in:Number(params.get('expires_in'))||3600});
+   const expiry=Number(params.get('expires_at'));
+   const expires_at=Number.isFinite(expiry)&&expiry>0?expiry:undefined;
+   if(email&&expires_at&&expires_at<=Date.now()/1000+60)throw Error('That Safari sign-in has expired. Use an unused email link, or request a new one when the email limit resets.');
+   await this.activateSession({access_token,refresh_token,expires_at,expires_in:Number(params.get('expires_in'))||3600},email);
    return true;
   }
   const token_hash=url.searchParams.get('token_hash'),type=url.searchParams.get('type')||'email';
   if(token_hash&&['email','magiclink','signup'].includes(type)){
    const value=await this.authRequest('/auth/v1/verify',{token_hash,type});
-   await this.activateSession(value);return true;
+   await this.activateSession(value,email);return true;
   }
   return false;
  }
