@@ -3,3 +3,5 @@
 window.TRAINING_CONFIG = { url: 'https://gclawgkpfgfgsavckwzx.supabase.co', key: 'sb_publishable_yFOp541toZPKI1kQgI0Uvw_HpJYqwTy' };
 
 window.TRAINING_CONFIG.trainerCodeOrigin = 'https://cfatulare.onrender.com';
+
+window.TRAINING_CONFIG.ownerCodeOrigin = 'https://cfatulare.onrender.com';

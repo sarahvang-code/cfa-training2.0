@@ -20,7 +20,7 @@ function teamMemberFields(name,trainingArea,allowUnassigned=false){
  return {name,training_area:trainingArea};
 }
 export class TrainingStore{
- constructor(storage,config={},trainerStorage=storage,siteOrigin=globalThis.location?.origin){this.storage=storage;this.trainerStorage=trainerStorage;this.config=config.url&&config.key?config:JSON.parse(storage.getItem('training-connection')||'{}');this.cloud=!!(this.config.url&&this.config.key);this.trainerCodeEnabled=!!(this.cloud&&this.config.trainerCodeOrigin&&this.config.trainerCodeOrigin===siteOrigin);this.session=null;this.trainerSession=null;this.trainerLastLoad=0;this.profile=null;this.data=this.cloud?{categories:[],items:[],members:[],progress:[],settings:{name:'Restaurant Training'}}:JSON.parse(storage.getItem('training-demo-v2')||'null')||seedReference();}
+ constructor(storage,config={},trainerStorage=storage,siteOrigin=globalThis.location?.origin){this.storage=storage;this.trainerStorage=trainerStorage;this.config=config.url&&config.key?config:JSON.parse(storage.getItem('training-connection')||'{}');this.cloud=!!(this.config.url&&this.config.key);this.trainerCodeEnabled=!!(this.cloud&&this.config.trainerCodeOrigin&&this.config.trainerCodeOrigin===siteOrigin);this.ownerCodeEnabled=!!(this.cloud&&this.config.ownerCodeOrigin&&this.config.ownerCodeOrigin===siteOrigin);this.session=null;this.trainerSession=null;this.trainerLastLoad=0;this.profile=null;this.data=this.cloud?{categories:[],items:[],members:[],progress:[],settings:{name:'Restaurant Training'}}:JSON.parse(storage.getItem('training-demo-v2')||'null')||seedReference();}
  persist(){this.storage.setItem('training-demo-v2',JSON.stringify(this.data));}
  async renameSection(categoryId,oldName,newName){if(!this.canEdit())throw Error('Owner access required.');if(this.cloud){await this.request('/rest/v1/items?category_id=eq.'+encodeURIComponent(categoryId)+'&section=eq.'+encodeURIComponent(oldName),{method:'PATCH',body:{section:newName}});await this.load();}else{this.data.items.filter(i=>i.category_id===categoryId&&i.section===oldName).forEach(i=>i.section=newName);this.persist();}}
  configure(url,key){url=url.trim().replace(/\/$/,'');key=key.trim();if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url))throw Error('Enter your Supabase project URL (https://your-project.supabase.co).');let valid=key.startsWith('sb_publishable_');if(key.startsWith('eyJ')){try{valid=JSON.parse(atob(key.split('.')[1])).role==='anon';}catch{valid=false;}}if(!valid)throw Error('Use the publishable key or legacy anon key, never a secret/service-role key.');this.storage.setItem('training-connection',JSON.stringify({url,key}));}
@@ -35,6 +35,13 @@ export class TrainingStore{
     const seconds=String(message).match(/after\s+(\d+)\s+seconds?\b/i)?.[1];
     const error=Error(seconds?`No new email was sent. Wait ${seconds} seconds before requesting another, or use a link you already have.`:'No new email was sent because the hourly limit was reached. You can use a link you already have, or wait before requesting another.');
     error.code='over_email_send_rate_limit';throw error;
+   }
+   if(r.status===429&&path==='/functions/v1/owner-code'){
+    const seconds=Number(r.headers.get('Retry-After'));
+    if(Number.isFinite(seconds)&&seconds>0&&seconds<=86400){
+     const delay=seconds<=60?Math.ceil(seconds)+' sec':seconds<=3600?Math.ceil(seconds/60)+' min':Math.ceil(seconds/3600)+' hr';
+     throw Error('Try owner sign-in again in about '+delay+'.');
+    }
    }
    if(code==='otp_expired')throw Error('That sign-in link or code has already been used or has expired. If it opened a Safari error page, paste the address from that tab here.');
    throw Error(message);
@@ -114,8 +121,15 @@ export class TrainingStore{
   }
   return false;
  }
- async activateSession(value,email){
-  if(!value.access_token)throw Error('Sign-in did not return a session. Request a new email.');
+ async signInWithOwnerPasscode(code){
+  if(!this.ownerCodeEnabled)throw Error('Owner passcode sign-in is available at the current training address.');
+  if(this.profile)throw Error('Sign out before starting an owner session.');
+  if(typeof code!=='string'||!/^\d{16,24}$/.test(code.trim()))throw Error('Enter the owner passcode using 16–24 digits.');
+  const value=await this.authRequest('/functions/v1/owner-code',{code:code.trim()});
+  await this.activateSession(value,undefined,'owner');
+ }
+ async activateSession(value,email,expectedRole){
+  if(!value.access_token)throw Error('Sign-in did not return a session. Try again.');
   this.clearTrainerSession();
   this.session={...value,expires_at:value.expires_at||Date.now()/1000+(value.expires_in||3600)};this.profile=null;
   try{
@@ -127,6 +141,7 @@ export class TrainingStore{
    const profiles=await this.request('/rest/v1/access_users?user_id=eq.'+encodeURIComponent(user.id));
    this.profile=profiles[0];
    if(!this.profile||!['owner','trainer','member'].includes(this.profile.role))throw Error('This email has not been approved for owner or trainer access.');
+   if(expectedRole&&this.profile.role!==expectedRole)throw Error('This account is not approved for owner access.');
    await this.load();this.rememberSession();
   }catch(e){this.clearSession();await this.load().catch(()=>{});throw e;}
  }
