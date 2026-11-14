@@ -20,9 +20,9 @@ function memory(){
  const values=new Map();
  return {getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};
 }
-function serviceFixture({overrides={}}={}){
+function serviceFixture({overrides={},getPasscode=conf.getPasscode}={}){
  const calls=[];
- const handle=createOwnerHandler({...conf,transport:async(url,opts)=>{
+ const handle=createOwnerHandler({...conf,getPasscode,transport:async(url,opts)=>{
   const path=relative(url),body=opts.body&&JSON.parse(opts.body);
   calls.push({path,body,headers:opts.headers});
   if(Object.hasOwn(overrides,path))return json(overrides[path]);
@@ -50,6 +50,22 @@ test('owner sign-in starts disabled; browser origin and length are checked befor
  assert.equal((await off.json()).code,'not_configured');
 });
 
+test('owner passcode errors distinguish a missing secret from a saved value that does not qualify',async()=>{
+ for(const value of ['1357135713571357','7382878121637','7265193948abc911','5037703122 456781','5555555555555555']){
+  const handle=createOwnerHandler({...conf,getPasscode:()=>value,transport:()=>assert.fail('Unexpected backend call')});
+  const result=await handle(request({code:passcode}));
+  assert.equal(result.status,503);
+  const body=await result.json();
+  assert.equal(body.code,'invalid_configuration');
+  assert.ok(!body.message.includes(value));
+ }
+ const padded=serviceFixture({getPasscode:()=>'​'+passcode});
+ const hidden=await padded.handle(request({code:passcode}));
+ assert.equal((await hidden.json()).code,'invalid_configuration');
+ const blanks=createOwnerHandler({...conf,getPasscode:()=>'  \n  ',transport:()=>assert.fail('Unexpected backend call')});
+ assert.equal((await (await blanks(request({code:passcode}))).json()).code,'not_configured');
+});
+
 test('a wrong owner passcode cannot reach Auth admin even when the database response is unexpected',async()=>{
  const {handle,calls}=serviceFixture();
  const wrong=await handle(request({code:'0684206517394029'}));
@@ -69,7 +85,7 @@ test('owner code sign-in applies retry limits without touching Auth email',async
 });
 
 test('a leading-zero passcode creates a normal session only for the existing owner and sends no email',async()=>{
- const {handle,calls}=serviceFixture();
+ const {handle,calls}=serviceFixture({getPasscode:()=>' \t'+passcode+'\r\n'});
  const result=await handle(request({code:passcode,user_id:otherId,email:'attacker@example.invalid'}));
  assert.equal(result.status,200);
  assert.match(result.headers.get('Cache-Control'),/no-store/);

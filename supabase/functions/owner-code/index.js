@@ -9,7 +9,8 @@ const ERRORS = {
   forbidden: [403, 'Owner passcode sign-in is only available on the training site.'],
   mfa_required: [403, 'This account uses an additional sign-in check. Use your regular owner sign-in.'],
   limited: [429, 'Too many owner sign-in attempts. Try again later.'],
-  not_configured: [503, 'The owner passcode has not been set up yet.'],
+  not_configured: [503, 'The owner passcode setting is missing. Save TRAINING_OWNER_PASSCODE in the Training App project’s Edge Function Secrets.'],
+  invalid_configuration: [503, 'The saved owner passcode is not accepted. In Supabase, save 16–24 digits with at least five different digits and no short repeating pattern.'],
   unavailable: [503, 'Owner sign-in is temporarily unavailable. Try again in a moment.'],
 };
 const digest = value => createHash('sha256').update(value,'utf8').digest();
@@ -59,8 +60,9 @@ export function createOwnerHandler({projectUrl,serviceKey,publicKey,getPasscode,
     if(!candidate) return fail('invalid_request');
 
     try {
-      const passcode=getPasscode();
-      if(!configuredPasscode(passcode)) return fail('not_configured');
+      const passcode=getPasscode()?.trim();
+      if(!passcode) return fail('not_configured');
+      if(!configuredPasscode(passcode)) return fail('invalid_configuration');
       if(!projectUrl||!serviceKey||!publicKey) return fail('unavailable');
       const same=timingSafeEqual(digest(candidate),digest(passcode));
       const adminHeaders={apikey:serviceKey,Authorization:'Bearer '+serviceKey,'Content-Type':'application/json'};
