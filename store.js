@@ -1,5 +1,10 @@
 import {primarySandwichItems} from './boh-builds.js';
 
+function sameOrder(a,b){return a.length===b.length&&a.every((id,i)=>id===b[i]);}
+export function categoriesInOrder(data,department){
+ return data.categories.filter(c=>c.department===department).sort((a,b)=>a.position-b.position||(a.id<b.id?-1:a.id>b.id?1:0));
+}
+
 export const titles=['Welcome & Restaurant Tour','BOH Food Safety','Primary','Secondary','Machines','Breading','Fries','RSA Assessment','Closing'];
 const starter=[['Clock in and meet your trainer','Restaurant tour','Uniform and handwashing expectations'],['Handwashing and glove use','Temperature checks','Prevent cross-contamination'],['Set up the primary station','Practice order assembly'],['Set up the secondary station','Practice station handoffs'],['Equipment overview','Safe operation and cleaning'],['Prepare the breading station','Review safe handling'],['Prepare the fry station','Review timers and holding procedures'],['Review restaurant safety expectations','Complete the trainer assessment'],['Complete station cleaning','Review the closing checklist']];
 export function seed(){const categories=titles.map((title,i)=>({id:`c${i}`,title,description:i===0?'A great first day starts here.':'Practice the essentials with your trainer.',position:i}));const items=starter.flatMap((a,i)=>a.map((title,j)=>({id:`i${i}-${j}`,category_id:`c${i}`,section:i===0?'Welcome':'Station essentials',title,notes:'Example checklist item. Replace with your restaurant’s approved training.',link:'',position:j})));return {categories,items,members:[{id:'m1',name:'Alex Morgan',role:'Team member',auth_user_id:null},{id:'m2',name:'Jordan Lee',role:'Team member',auth_user_id:null},{id:'m3',name:'Taylor Reed',role:'Team member',auth_user_id:null}],progress:[],settings:{name:'Restaurant Training'}};}
@@ -22,6 +27,29 @@ function teamMemberFields(name,trainingArea,allowUnassigned=false){
 export class TrainingStore{
  constructor(storage,config={},trainerStorage=storage,siteOrigin=globalThis.location?.origin){this.storage=storage;this.trainerStorage=trainerStorage;this.config=config.url&&config.key?config:JSON.parse(storage.getItem('training-connection')||'{}');this.cloud=!!(this.config.url&&this.config.key);this.trainerCodeEnabled=!!(this.cloud&&this.config.trainerCodeOrigin&&this.config.trainerCodeOrigin===siteOrigin);this.ownerCodeEnabled=!!(this.cloud&&this.config.ownerCodeOrigin&&this.config.ownerCodeOrigin===siteOrigin);this.session=null;this.trainerSession=null;this.trainerLastLoad=0;this.profile=null;this.data=this.cloud?{categories:[],items:[],members:[],progress:[],settings:{name:'Restaurant Training'}}:JSON.parse(storage.getItem('training-demo-v2')||'null')||seedReference();}
  persist(){this.storage.setItem('training-demo-v2',JSON.stringify(this.data));}
+ async reorderCategories(department,previousIds,orderedIds){
+  if(!this.canEdit())throw Error('Only the owner can reorder training categories.');
+  if(!['FOH','BOH'].includes(department)||!Array.isArray(previousIds)||!Array.isArray(orderedIds))throw Error('Choose one department and its category order.');
+  const current=categoriesInOrder(this.data,department).map(c=>c.id);
+  if(sameOrder(current,orderedIds))return;
+  if(!sameOrder(current,previousIds))throw Error('Categories changed on another device. Refresh the list and try again.');
+  if(current.length!==orderedIds.length||new Set(orderedIds).size!==current.length||orderedIds.some(id=>!current.includes(id)))throw Error('Include every category in this department exactly once.');
+  if(this.cloud){
+   await this.request('/rest/v1/rpc/reorder_training_categories',{method:'POST',body:{p_department:department,p_previous_ids:previousIds,p_ordered_ids:orderedIds}});
+  }
+  const positions=new Map(orderedIds.map((id,i)=>[id,i]));
+  this.data.categories=this.data.categories.map(c=>c.department===department?{...c,position:positions.get(c.id)}:c);
+  if(!this.cloud)this.persist();
+ }
+ async renameCategory(id,title,description){
+  if(!this.canEdit())throw Error('Only the owner can edit training.');
+  const category=this.data.categories.find(c=>c.id===id);
+  if(!category)throw Error('This category is no longer in the list.');
+  if(!this.cloud){await this.save('categories',{...category,title,description});return;}
+  const result=await this.request('/rest/v1/categories?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:{title,description}});
+  if(!Array.isArray(result)||!result.length)throw Error('This category could not be updated. Refresh the list and try again.');
+  await this.load();
+ }
  async renameSection(categoryId,oldName,newName){if(!this.canEdit())throw Error('Owner access required.');if(this.cloud){await this.request('/rest/v1/items?category_id=eq.'+encodeURIComponent(categoryId)+'&section=eq.'+encodeURIComponent(oldName),{method:'PATCH',body:{section:newName}});await this.load();}else{this.data.items.filter(i=>i.category_id===categoryId&&i.section===oldName).forEach(i=>i.section=newName);this.persist();}}
  configure(url,key){url=url.trim().replace(/\/$/,'');key=key.trim();if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url))throw Error('Enter your Supabase project URL (https://your-project.supabase.co).');let valid=key.startsWith('sb_publishable_');if(key.startsWith('eyJ')){try{valid=JSON.parse(atob(key.split('.')[1])).role==='anon';}catch{valid=false;}}if(!valid)throw Error('Use the publishable key or legacy anon key, never a secret/service-role key.');this.storage.setItem('training-connection',JSON.stringify({url,key}));}
  async request(path,{method='GET',body,prefer='return=representation'}={}){if(!this.session&&method!=='GET')throw Error('Owner or trainer sign-in is required to save changes.');if(this.session&&this.session.expires_at<Date.now()/1000+60)await this.refresh();const r=await fetch(this.config.url+path,{method,headers:{apikey:this.config.key,...(this.session?{Authorization:`Bearer ${this.session.access_token}`}:{ }),'Content-Type':'application/json',Prefer:prefer},body:body===undefined?undefined:JSON.stringify(body)});const txt=await r.text();let value;try{value=txt?JSON.parse(txt):null;}catch{throw Error('Unexpected response from Supabase.');}if(!r.ok)throw Error(value?.message||value?.msg||value?.error_description||'Could not save. Check your connection and permissions.');return value;}
