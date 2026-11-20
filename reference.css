@@ -66,3 +66,23 @@
 .category-order-buttons button{display:grid;place-items:center;min-width:44px;min-height:44px;padding:0;background:white;color:#801532;font-size:18px;font-weight:700}
 .category-order-buttons button:disabled{opacity:.35}
 .category-order-status{min-height:1.4em;color:var(--muted);font-size:12px}
+.training-celebration{--cow-size:clamp(150px,29dvh,250px);--cow-jump:clamp(28px,6dvh,52px);width:min(420px,calc(100% - 32px));max-height:90dvh;overflow:auto;border:1px solid #f2d7e2;border-radius:24px;padding:28px 24px 24px;background:linear-gradient(180deg,#fff7fb,#fff 75%);text-align:center;box-shadow:0 24px 90px #3a152c33}
+.training-celebration[open]{animation:training-cow-appear .3s ease-out}
+.training-celebration::backdrop{background:#28233088;backdrop-filter:blur(3px)}
+.training-celebration .celebration-close{position:absolute;top:10px;right:10px;display:grid;place-items:center;width:44px;height:44px;padding:0;border:0;border-radius:50%;background:transparent;color:#655b66;font-size:28px;line-height:1}
+.training-celebration button:focus-visible{outline:3px solid #5a7ea5;outline-offset:3px}
+.training-celebration .celebration-close:hover{background:#fbe6ef}
+.celebration-label{display:inline-block;margin:10px 25px 0;padding:7px 13px;border-radius:20px;background:#f8e8f1;color:#9b2151;font-size:14px;font-weight:700}
+.training-cow-stage{height:calc(var(--cow-size) + var(--cow-jump) + 10px);display:flex;align-items:flex-end;justify-content:center;position:relative;isolation:isolate}
+.training-cow{display:block;width:var(--cow-size);height:var(--cow-size);max-width:100%;object-fit:contain;position:relative;z-index:1;transform-origin:center 90%;filter:drop-shadow(0 4px 3px #6d507411);user-select:none}
+.training-cow-shadow{position:absolute;bottom:calc(var(--cow-size) * .09);width:calc(var(--cow-size) * .52);height:12px;border-radius:50%;background:#8b7ca42b;filter:blur(4px)}
+.training-celebration[open] .training-cow{animation:training-cow-hop .78s ease-in-out .2s 3}
+.training-celebration[open] .training-cow-shadow{animation:training-cow-shadow .78s ease-in-out .2s 3}
+.training-celebration h2{font-family:inherit;font-size:27px;font-weight:800;letter-spacing:-.6px;margin:4px 0 12px;color:#3c2b3f}
+.training-celebration p{font-size:16px;line-height:1.5;overflow-wrap:anywhere;color:#6e6370;margin:0 0 22px}
+.training-celebration .celebration-done{min-height:46px;min-width:160px;font-size:16px;border-radius:12px;padding:12px 20px}
+@keyframes training-cow-appear{from{opacity:0;transform:translateY(30px) scale(.92)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes training-cow-hop{0%,100%{transform:translateY(0) scale(1)}14%{transform:translateY(4px) scale(1.05,.94)}44%{transform:translateY(calc(-1 * var(--cow-jump))) scale(.98,1.03)}75%{transform:translateY(0) scale(1.05,.94)}88%{transform:translateY(-5px) scale(1)}}
+@keyframes training-cow-shadow{0%,100%{transform:scaleX(1);opacity:.8}44%{transform:scaleX(.6);opacity:.3}75%{transform:scaleX(1.08);opacity:.9}}
+@media(max-width:400px){.training-celebration{padding:24px 18px 20px}.training-celebration h2{font-size:24px}}
+@media(prefers-reduced-motion:reduce){.training-celebration[open],.training-celebration[open] .training-cow,.training-celebration[open] .training-cow-shadow{animation:none}}
