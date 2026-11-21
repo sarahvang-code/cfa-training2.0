@@ -86,3 +86,183 @@
 @keyframes training-cow-shadow{0%,100%{transform:scaleX(1);opacity:.8}44%{transform:scaleX(.6);opacity:.3}75%{transform:scaleX(1.08);opacity:.9}}
 @media(max-width:400px){.training-celebration{padding:24px 18px 20px}.training-celebration h2{font-size:24px}}
 @media(prefers-reduced-motion:reduce){.training-celebration[open],.training-celebration[open] .training-cow,.training-celebration[open] .training-cow-shadow{animation:none}}
+
+/* Colors and graphic patterns from the restaurant's supplied design references. */
+:root{
+ --cfa-red:#cf162d;--cfa-charcoal:#404042;--cfa-blue:#c0d7e2;
+ --cfa-slate:#495a66;--cfa-blush:#e3d3cf;--cfa-gray:#e8e7ea;
+ --red:var(--cfa-red);--muted:#62656a;--line:#e1e3e5;
+ --cfa-pattern-stitch:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2296%22%20height%3D%2296%22%20viewBox%3D%220%200%2096%2096%22%3E%3Cpath%20d%3D%22M4%208h7M20%208h7M36%208h7M4%2024h7M20%2024h7M36%2024h7M4%2040h7M20%2040h7M36%2040h7M56%204v8M56%2020v8M56%2036v8M72%204v8M72%2020v8M72%2036v8M88%204v8M88%2020v8M88%2036v8M8%2056v8M8%2072v8M8%2088v8M24%2056v8M24%2072v8M24%2088v8M40%2056v8M40%2072v8M40%2088v8M52%2056h7M68%2056h7M84%2056h7M52%2072h7M68%2072h7M84%2072h7M52%2088h7M68%2088h7M84%2088h7%22%20fill%3D%22none%22%20stroke%3D%22%23cf162d%22%20stroke-width%3D%222.4%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E");
+ --cfa-pattern-dashes:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2280%22%20height%3D%2224%22%20viewBox%3D%220%200%2080%2024%22%3E%3Cpath%20d%3D%22M4%202h13M34%202h13M64%202h13M19%2014h13M49%2014h13M79%2014h13%22%20fill%3D%22none%22%20stroke%3D%22%23cf162d%22%20stroke-width%3D%222.4%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E");
+ --cfa-pattern-diagonal:repeating-linear-gradient(135deg,transparent 0 8px,var(--cfa-red) 8px 9.5px,transparent 9.5px 17px);
+ --cfa-pattern-dots:radial-gradient(circle at 2px 2px,var(--cfa-red) 1.25px,transparent 1.5px);
+ background:#fafafa;color:var(--cfa-charcoal);font-size:16px;
+}
+body{background:#fafafa}
+button.primary,.reference-menu .welcome-button{box-shadow:none}
+button.primary:hover{background:#ae1025;border-color:#ae1025}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--cfa-slate);outline-offset:3px}
+button,input,select,textarea{font-size:16px}
+button{min-height:44px}
+label{font-size:14px}
+.helper,.tiny,.panel .tiny,.item-info p,.settings-grid .panel p,.status-note,.starter-note{font-size:14px;line-height:1.65}
+.header-inner{max-width:920px;min-height:80px;height:auto;padding:14px 24px;gap:16px}
+.reference-header{border-bottom:0;box-shadow:0 2px 12px #40404205}
+.reference-header::after{content:'';display:block;height:4px;background-image:var(--cfa-pattern-dashes);background-position:center;background-size:80px 24px;opacity:.5}
+.header-inner .brand{font-size:13px;letter-spacing:.08em;gap:10px;color:var(--cfa-charcoal)}
+.header-inner .brand-symbol{width:38px;height:38px;border-radius:12px;background:var(--cfa-red)}
+.header-inner .brand-symbol svg{width:23px;height:23px}
+.header-inner .actions{flex-wrap:nowrap;gap:5px}
+.header-inner button{min-width:44px;min-height:44px;font-size:14px;padding:9px 12px;border:0;border-radius:999px;background:transparent;color:var(--cfa-slate)}
+.header-inner .department-button.active{background:var(--cfa-red);color:#fff}
+.header-inner button:hover{background:#f3f4f5}
+.header-inner .department-button.active:hover{background:#ae1025}
+.header-inner .plain{display:grid;place-items:center;padding:10px}
+.reference-main{max-width:920px;padding:28px 24px 120px}
+.connection-status{font-size:13px;gap:9px;margin-bottom:24px;color:var(--cfa-slate)}
+.connection-status .actions .primary,.connection-status .plain{font-size:14px;padding:9px 13px}
+.demo-banner{background:#edf4f7;border-color:#d5e4eb;color:var(--cfa-slate);font-size:13px}
+.demo-banner button{font-size:13px;color:var(--cfa-slate)}
+.page-head{position:relative;display:flex;flex-wrap:wrap;justify-content:space-between;gap:14px;align-items:center;padding:25px 26px;background:#fff;border:1px solid var(--line);border-radius:20px;margin-bottom:26px;border-top:4px solid var(--cfa-blue)}
+.page-head-copy{min-width:0}
+.page-head .eyebrow{display:block;font-size:12px;letter-spacing:.12em;margin-bottom:10px;color:var(--cfa-slate)}
+.reference-main h1{font-size:32px;letter-spacing:-1px;color:var(--cfa-charcoal)}
+.sub{font-size:16px;line-height:1.6;color:var(--cfa-slate)}
+.page-head .actions{margin:0}
+.page-head.training-hero{display:block;min-height:258px;padding:40px;border:0;background:var(--cfa-red);color:#fff;overflow:hidden;border-radius:24px}
+.training-hero .page-head-copy{position:relative;z-index:1;max-width:62%}
+.training-hero .eyebrow{color:#fff;font-size:13px;margin:0 0 16px;letter-spacing:.14em}
+.reference-main .training-hero h1{font-size:44px;line-height:1.12;color:#fff;letter-spacing:-1.5px;margin-bottom:16px}
+.training-hero .sub{color:#fff;font-size:17px;max-width:340px}
+.training-pattern-art{position:absolute;right:38px;top:26px;width:206px;height:206px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:6px;transform:rotate(5deg);pointer-events:none}
+.training-pattern-art span{display:block;background-color:#fff}
+.training-pattern-art .pattern-stitch{background-image:var(--cfa-pattern-stitch);background-size:80px 80px}
+.training-pattern-art .pattern-diagonal{background-image:var(--cfa-pattern-diagonal)}
+.training-pattern-art .pattern-dots{background-image:var(--cfa-pattern-dots);background-size:8px 8px}
+.training-pattern-art span:nth-child(1){background-color:var(--cfa-blue);border-radius:16px 16px 0 16px}
+.training-pattern-art span:nth-child(2){border-radius:0 50% 0 0}
+.training-pattern-art span:nth-child(3){background-color:var(--cfa-blush);border-radius:0 0 0 50%}
+.training-pattern-art span:nth-child(4){background-color:var(--cfa-gray);border-radius:16px 0 16px 0}
+.learning-path-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:32px 0 17px}
+.learning-path-heading h2{font-size:21px;letter-spacing:-.5px}
+.learning-path-heading>span{font-size:14px;color:var(--cfa-slate)}
+.reference-menu{gap:14px}
+.reference-menu button{min-height:78px;font-size:16px;padding:20px;border-radius:17px;box-shadow:0 3px 13px #40404203;line-height:1.45;color:var(--cfa-charcoal);border-color:var(--line)}
+.reference-menu .training-tile{position:relative;justify-content:flex-start;gap:16px;overflow:hidden;transition:background .15s,border-color .15s,transform .15s}
+.reference-menu .training-tile:hover{background:#fdf8f8;border-color:#d6a5ad;transform:translateY(-2px)}
+.reference-menu .training-tile-icon{display:grid;place-items:center;flex:0 0 44px;width:44px;height:44px;padding:0;border-radius:13px;background:#fbeaec;color:var(--cfa-red)}
+.training-tile-icon svg{width:24px;height:24px}
+.reference-menu .training-tile:nth-child(3n) .training-tile-icon{background:#e8f0f4;color:var(--cfa-slate)}
+.reference-menu .training-tile:nth-child(4n) .training-tile-icon{background:#f2e9e6;color:var(--cfa-slate)}
+.reference-menu .training-tile-label{position:relative;z-index:1;padding:0;min-width:0;color:inherit;font-size:16px;font-weight:700;line-height:1.4}
+.reference-menu .welcome-button{min-height:98px;padding:22px;background:var(--cfa-blue);color:var(--cfa-charcoal);border-color:var(--cfa-blue)}
+.reference-menu .welcome-button:hover{background:#b3cddc;border-color:#a6c4d5}
+.reference-menu .welcome-button .training-tile-icon{background:#fff;color:var(--cfa-red);flex-basis:48px;width:48px;height:48px}
+.reference-menu .welcome-button .training-tile-label{font-size:20px;max-width:calc(100% - 100px);color:var(--cfa-charcoal)}
+.reference-menu .welcome-button::after{content:'';position:absolute;right:0;top:0;width:95px;height:100%;background-image:var(--cfa-pattern-stitch);background-size:76px 76px;opacity:.22;pointer-events:none}
+.reference-menu .training-shortcut{justify-content:flex-start;gap:11px;min-height:62px;background:#eeedef;box-shadow:none;border-color:transparent;color:var(--cfa-slate)}
+.reference-menu .training-shortcut:hover{background:#e4e3e7;border-color:#d1cfd6}
+.training-shortcut svg{width:21px;height:21px}
+.reference-menu .training-shortcut span{font-size:14px;color:inherit;font-weight:650;padding:0;line-height:1.4}
+.starter-note{margin-top:22px;color:var(--cfa-slate)}
+.panel,.selector,.progress-card,.empty{border-radius:17px;border-color:var(--line);box-shadow:none}
+.panel-heading h3,.item-info h3{font-size:16px;color:var(--cfa-charcoal)}
+.panel-heading button,.item-info button,.editor-actions button,.item-info .pathway-link,.add-item,.open-progress,.form-actions button{font-size:14px;min-height:44px}
+.editor-actions{gap:8px}
+.item-info select,.overall-status{font-size:16px;min-height:44px}
+.training-checkbox{width:24px;height:24px;margin-top:2px}
+.reference-item{gap:14px;padding:22px 0}
+.item-info .pathway-link{align-items:center;background:#fbeaec;border-color:#f2c6cd;color:#a61125}
+.selector{border-top:4px solid var(--cfa-blue);padding:20px;gap:12px}
+.selector label{font-size:14px;color:var(--cfa-slate)}
+.selector .tiny{font-size:14px}
+.progress-card{border-left:4px solid var(--cfa-blue)}
+.progress-card h3{font-size:17px;color:var(--cfa-charcoal)}
+.progress-card p{font-size:14px}
+.progress-card:hover{background:#f8fafb;border-color:#abc5d5}
+.team-meter{background:#edf3f6}
+.meter-line{font-size:14px;color:var(--cfa-slate)}
+.meter-line strong{color:var(--cfa-red);font-size:16px}
+.team-meter progress,.team-meter progress::-webkit-progress-bar{background:#d7e1e7}
+.overall-control label{font-size:14px}
+.overall-status{background:#f2e9e6;border-color:#d6c3bc;color:#61483d}
+.overall-status.is-trained{background:#e7f3eb;border-color:#99baa6;color:#28613d}
+.roster-department,.roster-group-heading span{background:var(--cfa-gray);color:var(--cfa-slate);font-size:13px}
+.cross-trained{background:#fbeaec;border-color:#edc9d0;color:#a61125;font-size:13px}
+.open-progress{border-radius:12px;background:#f5f7f8;color:var(--cfa-slate)}
+.reference-nav{background:#fff;border-top:1px solid #dce2e5;padding:10px 18px calc(10px + env(safe-area-inset-bottom));box-shadow:0 -4px 20px #40404204}
+.reference-nav>div{max-width:872px;gap:8px}
+.reference-nav button{font-size:14px;min-height:48px;background:transparent;border-radius:13px;color:var(--cfa-slate)}
+.reference-nav button.active{background:#fbeaec;color:#b61027;box-shadow:inset 0 -3px var(--cfa-red)}
+.reference-nav button:hover{background:#f4f6f7}
+footer{position:relative;padding-top:22px;border-top-color:#dce2e5;font-size:13px;color:var(--cfa-slate)}
+footer::before{content:'';position:absolute;left:0;top:-2px;width:72px;height:4px;background:var(--cfa-red)}
+footer .plain{font-size:13px;min-height:44px}
+dialog{border-radius:20px;border-color:#dbe2e7}
+dialog h2{color:var(--cfa-charcoal)}
+.form-error{font-size:14px}
+.training-celebration{border-color:#d8e4ea;background:linear-gradient(180deg,#f2f7f9,#fff 72%)}
+.training-celebration h2{color:var(--cfa-charcoal)}
+.training-celebration p{color:var(--cfa-slate)}
+.training-celebration .celebration-label{background:var(--cfa-blue);color:#344752}
+.training-cow-stage::before{content:'';position:absolute;left:0;right:0;top:40px;height:100px;background-image:var(--cfa-pattern-dots);background-size:10px 10px;opacity:.11;mask-image:linear-gradient(90deg,#000,transparent 35%,transparent 65%,#000);pointer-events:none}
+.training-celebration .celebration-close:hover{background:#e8f0f4}
+@media(max-width:760px){
+ .header-inner{min-height:72px;padding:10px 16px;gap:8px}
+ .header-inner .brand{font-size:12px;gap:8px;letter-spacing:.035em}
+ .header-inner .brand-symbol{width:32px;height:32px;border-radius:10px}
+ .header-inner .brand-symbol svg{width:21px;height:21px}
+ .header-inner button{font-size:13px;padding:8px 10px;min-width:42px}
+ .header-inner .plain{padding:10px}
+ .reference-main{padding:22px 17px 116px}
+ .connection-status{margin-bottom:20px}
+ .page-head{padding:22px 20px;border-radius:18px}
+ .reference-main h1{font-size:29px}
+ .page-head.training-hero{min-height:238px;padding:28px 24px;border-radius:21px}
+ .training-hero .page-head-copy{max-width:calc(100% - 106px)}
+ .training-hero .eyebrow{font-size:11px;letter-spacing:.1em;line-height:1.6;margin-bottom:12px}
+ .reference-main .training-hero h1{font-size:35px;line-height:1.1;letter-spacing:-1px;margin-bottom:12px}
+ .training-hero .sub{font-size:16px;line-height:1.5}
+ .training-pattern-art{width:108px;height:108px;top:auto;right:20px;bottom:27px;gap:4px}
+ .training-pattern-art .pattern-stitch{background-size:56px 56px}
+ .training-pattern-art .pattern-diagonal{background-size:100% 100%}
+ .training-pattern-art .pattern-dots{background-size:7px 7px}
+ .learning-path-heading{margin:27px 0 14px;gap:6px}
+ .learning-path-heading h2{font-size:20px}
+ .learning-path-heading>span{font-size:13px}
+ .reference-menu{gap:11px}
+ .reference-menu button{padding:17px 14px;min-height:92px}
+ .reference-menu .training-tile{gap:10px;align-items:flex-start;flex-direction:column}
+ .reference-menu .training-tile-icon{width:36px;height:36px;flex-basis:36px;border-radius:10px}
+ .training-tile-icon svg{width:21px;height:21px}
+ .reference-menu .training-tile-label{font-size:15px;line-height:1.45}
+ .reference-menu .welcome-button{flex-direction:row;align-items:center;padding:20px 16px;min-height:94px;gap:13px}
+ .reference-menu .welcome-button .training-tile-icon{width:42px;height:42px;flex-basis:42px}
+ .reference-menu .welcome-button .training-tile-label{font-size:18px;max-width:calc(100% - 65px)}
+ .reference-menu .welcome-button::after{width:65px;opacity:.14}
+ .reference-menu .training-shortcut{padding:15px 14px;min-height:70px;gap:9px}
+ .reference-menu .training-shortcut span{font-size:14px}
+ .panel{padding:20px 17px}
+ .panel-heading h3,.item-info h3{font-size:16px}
+ .panel-heading button{font-size:14px;padding:9px 11px}
+ .reference-item .item-info{flex-basis:calc(100% - 38px)}
+ .training-checkbox{width:24px;height:24px}
+ .reference-nav{padding:8px 12px calc(8px + env(safe-area-inset-bottom))}
+ .reference-nav button{font-size:14px;padding:12px 5px}
+ .selector{padding:18px 16px}
+}
+@media(max-width:360px){
+ .header-inner{padding:10px 12px;gap:6px}
+ .header-inner .brand{font-size:11px;gap:6px;letter-spacing:0}
+ .header-inner .brand-symbol{width:28px;height:28px}
+ .header-inner .actions{gap:2px}
+ .header-inner button{font-size:12px;padding:8px;min-width:38px}
+ .header-inner .plain{padding:8px}
+ .page-head.training-hero{padding:25px 20px;min-height:240px}
+ .training-hero .page-head-copy{max-width:calc(100% - 85px)}
+ .reference-main .training-hero h1{font-size:32px}
+ .training-pattern-art{width:86px;height:86px;right:16px;bottom:26px}
+ .reference-menu .training-tile-label{font-size:14px}
+ .reference-nav button{font-size:13px}
+}
+@media(prefers-reduced-motion:reduce){.reference-menu .training-tile{transition:none}.reference-menu .training-tile:hover{transform:none}}
