@@ -266,3 +266,81 @@ dialog h2{color:var(--cfa-charcoal)}
  .reference-nav button{font-size:13px}
 }
 @media(prefers-reduced-motion:reduce){.reference-menu .training-tile{transition:none}.reference-menu .training-tile:hover{transform:none}}
+
+/* Fluid phone and tablet layouts, including short landscape viewports. */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body,#app{min-width:0;max-width:100%}
+.reference-header{padding-top:env(safe-area-inset-top,0px)}
+.reference-main{width:100%;padding-bottom:calc(110px + env(safe-area-inset-bottom,0px))}
+.reference-menu>button,.panel,.settings-grid>*,.page-head-copy,.item-info{min-width:0}
+.page-head-copy,.training-tile-label,.training-shortcut span,.panel-heading h3,.roster-name,.item-info h3,.status-note,footer span{overflow-wrap:anywhere}
+.page-head{gap:16px}
+.training-check-target{display:grid;place-items:start center;flex:0 0 44px;width:44px;min-height:44px;margin:0;padding:2px 0 0;cursor:pointer}
+.training-check-target .training-checkbox{margin:0;width:24px;height:24px;cursor:pointer}
+.training-check-target:has(input:disabled),.training-check-target input:disabled{cursor:default}
+.reference-item{gap:10px}
+.reference-item .item-info{flex:1 1 0;min-width:0}
+.reference-main select,dialog select{
+ appearance:none;-webkit-appearance:none;min-width:0;max-width:100%;padding-inline-end:38px;
+ background-image:linear-gradient(45deg,transparent 50%,#495a66 50%),linear-gradient(135deg,#495a66 50%,transparent 50%);
+ background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat;
+}
+.field input,.field select,.field textarea{min-width:0;max-width:100%;font-size:16px}
+.selector select{width:100%;flex:1 1 220px}
+.form-actions{flex-wrap:wrap}
+.build-controls .build-play{font-size:14px}
+.build-step{font-size:14px;overflow-wrap:anywhere}
+.build-controls .build-thumbnail{min-height:44px}
+.reference-nav{inset-inline:0;width:auto}
+.reference-nav>div{grid-template-columns:repeat(3,minmax(0,1fr))}
+.reference-nav button{min-width:0;white-space:normal;line-height:1.4}
+footer{flex-wrap:wrap;gap:10px}
+dialog{max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);padding:clamp(18px,4vw,27px);overscroll-behavior:contain}
+.training-celebration{max-height:calc(100dvh - 24px)}
+@media(min-width:600px) and (max-width:1000px){
+ .header-inner{padding-inline:24px}
+ .header-inner .brand{font-size:13px;gap:10px}
+ .header-inner .brand-symbol{width:36px;height:36px}
+ .reference-main{padding-inline:24px}
+ .page-head.training-hero{padding:35px;min-height:240px}
+ .training-hero .page-head-copy{max-width:62%}
+ .reference-main .training-hero h1{font-size:40px}
+ .training-hero .eyebrow{font-size:13px}
+ .training-pattern-art{width:160px;height:160px;right:32px;top:36px;bottom:auto;gap:5px}
+ .reference-menu .training-tile{flex-direction:row;align-items:center;min-height:88px;gap:14px}
+ .reference-menu .training-tile-label{font-size:16px}
+ .reference-menu .training-tile-icon{width:42px;height:42px;flex-basis:42px}
+ .reference-menu .welcome-button .training-tile-label{font-size:20px}
+}
+@media(min-width:720px){.settings-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:480px){
+ .page-head .actions{width:100%;gap:8px}
+ .page-head .actions>button{flex:1 1 auto}
+ .form-actions>button{flex:1 1 100px}
+ .overall-control{align-items:flex-start}
+ .overall-control select{width:100%}
+ .category-order-name{font-size:14px}
+ .team-progress .panel-heading .roster-name{font-size:16px}
+ .item-info select{width:100%;max-width:230px}
+}
+@media(max-width:360px){
+ .learning-path-heading{flex-direction:column;align-items:flex-start;gap:5px}
+ .reference-menu{grid-template-columns:minmax(0,1fr)}
+ .reference-menu .training-tile{flex-direction:row;align-items:center;min-height:78px;gap:13px}
+ .reference-menu .training-tile-label{font-size:16px}
+ .reference-menu .training-shortcut{min-height:58px}
+ .reference-menu .welcome-button .training-tile-label{font-size:17px}
+ .header-inner [data-action=home]{display:none}
+ .header-inner button{min-width:44px}
+}
+@media(max-height:600px) and (min-width:480px){
+ .training-celebration{--cow-size:140px;--cow-jump:26px;width:min(600px,calc(100% - 24px));padding:18px 22px;max-height:calc(100dvh - 20px)}
+ .training-celebration[open]{display:grid;grid-template-columns:140px minmax(0,1fr);column-gap:22px;row-gap:9px;align-items:center;text-align:left}
+ .training-celebration .training-cow-stage{grid-column:1;grid-row:1 / span 4;width:140px;height:180px;align-self:center}
+ .training-celebration .celebration-label{grid-column:2;grid-row:1;justify-self:start;margin:0 28px 0 0;padding:6px 10px;font-size:13px}
+ .training-celebration h2{grid-column:2;grid-row:2;font-size:24px;margin:0}
+ .training-celebration p{grid-column:2;grid-row:3;font-size:15px;line-height:1.4;margin:0}
+ .training-celebration .celebration-done{grid-column:2;grid-row:4;justify-self:start;min-width:140px;margin:0}
+ .training-celebration .celebration-close{top:4px;right:4px}
+}
+@media(hover:none){.reference-menu .training-tile:hover{transform:none}}

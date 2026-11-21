@@ -151,7 +151,7 @@ function trainingItem(item,showEdit){
  const status=progress?.status||'Not started';
  const id=esc(item.id),title=esc(item.title),canRecord=store.canTrain()&&memberId&&!item.hidden;
  return `<div class="reference-item ${item.hidden?'hidden-item':''}">
-  <input class="training-checkbox" type="checkbox" aria-label="Mark ${title} trained" data-check="${id}" ${status==='Trained'?'checked':''} ${canRecord?'':'disabled'}>
+  <label class="training-check-target"><input class="training-checkbox" type="checkbox" aria-label="Mark ${title} trained" data-check="${id}" ${status==='Trained'?'checked':''} ${canRecord?'':'disabled'}></label>
   <div class="item-info"><h3>${title}${item.hidden?' <span class="badge">Hidden</span>':''}</h3>
    ${item.notes?`<p class="item-instructions">${esc(item.notes)}</p>`:''}
    ${buildControls(item)}
